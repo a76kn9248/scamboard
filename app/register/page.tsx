@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import ShameMessage from "@/components/ShameMessage";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -73,98 +74,112 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <div className="bg-[#0d0d12] border border-gray-800 p-8">
-        <h1 className="text-2xl font-bold text-green-500 mb-2 text-center">
-          REGISTER
-        </h1>
-        <p className="text-gray-500 font-mono text-sm text-center mb-8">
-          Join the SCAMBOARD community
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              EMAIL
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-green-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-            />
+    <div className="min-h-screen flex items-center justify-center px-4 py-16">
+      <div className="w-full max-w-md">
+        <div className="card p-8">
+          <div className="text-center mb-8">
+            <span className="text-4xl mb-4 block">&#x1F43A;</span>
+            <h1 className="text-2xl font-bold text-[var(--green-primary)] mb-2">
+              JOIN THE PACK
+            </h1>
+            <p className="text-[var(--foreground-muted)] text-sm">
+              Become a SCAMBOARD watchdog
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              NICKNAME
-            </label>
-            <input
-              type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder="3-20 chars, alphanumeric + underscores"
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-green-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="input"
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Nickname
+              </label>
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="3-20 chars, alphanumeric + underscores"
+                required
+                className="input"
+              />
+              <p className="text-xs text-[var(--foreground-dimmed)] mt-1">
+                This will be your public display name
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min 8 characters"
+                required
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="input"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <TurnstileWidget
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken("")}
             />
+
+            {error && (
+              <p className="text-[var(--red-primary)] text-sm">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading || !turnstileToken}
+              className="btn-secondary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? "Creating account..." : "Register"}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <span className="text-[var(--foreground-muted)] text-sm">
+              Already have an account?{" "}
+            </span>
+            <Link
+              href="/login"
+              className="text-[var(--red-primary)] hover:underline text-sm"
+            >
+              Login
+            </Link>
           </div>
-
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              PASSWORD
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min 8 characters"
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-green-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              CONFIRM PASSWORD
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-green-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-            />
-          </div>
-
-          <TurnstileWidget
-            onVerify={setTurnstileToken}
-            onExpire={() => setTurnstileToken("")}
-          />
-
-          {error && (
-            <p className="text-red-400 font-mono text-sm">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading || !turnstileToken}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3 font-mono text-sm transition-colors"
-          >
-            {isLoading ? "REGISTERING..." : "REGISTER"}
-          </button>
-        </form>
+        </div>
 
         <div className="mt-6 text-center">
-          <span className="text-gray-600 font-mono text-sm">
-            Already have an account?{" "}
-          </span>
-          <Link
-            href="/login"
-            className="text-red-400 hover:underline font-mono text-sm"
-          >
-            LOGIN
-          </Link>
+          <ShameMessage />
         </div>
       </div>
     </div>

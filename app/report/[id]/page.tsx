@@ -3,9 +3,15 @@
 import { useEffect, useState, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
 import CommentThread from "@/components/CommentThread";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import ThreatBadge from "@/components/ThreatBadge";
+import ScammerAvatar from "@/components/ScammerAvatar";
+import RoastSection from "@/components/RoastSection";
+import BountyBadge from "@/components/BountyBadge";
+import ShameMessage from "@/components/ShameMessage";
 
 interface Comment {
   id: string;
@@ -26,39 +32,13 @@ interface Report {
   createdAt: string;
   updatedAt: string;
   comments: Comment[];
+  roastTitle?: string | null;
+  shameLocked?: boolean;
 }
 
-function getThreatLevel(confirms: number): {
-  label: string;
-  color: string;
-  bgColor: string;
-} {
-  if (confirms >= 20) {
-    return {
-      label: "EXTREME",
-      color: "text-red-400",
-      bgColor: "bg-red-500/20 border-red-500/50",
-    };
-  }
-  if (confirms >= 10) {
-    return {
-      label: "HIGH",
-      color: "text-orange-400",
-      bgColor: "bg-orange-500/20 border-orange-500/50",
-    };
-  }
-  if (confirms >= 5) {
-    return {
-      label: "MEDIUM",
-      color: "text-yellow-400",
-      bgColor: "bg-yellow-500/20 border-yellow-500/50",
-    };
-  }
-  return {
-    label: "LOW",
-    color: "text-gray-400",
-    bgColor: "bg-gray-500/20 border-gray-500/50",
-  };
+interface BountyData {
+  count: number;
+  userHasBounty: boolean;
 }
 
 export default function ReportPage({
@@ -70,6 +50,7 @@ export default function ReportPage({
   const { data: session } = useSession();
   const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
+  const [bountyData, setBountyData] = useState<BountyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -91,6 +72,13 @@ export default function ReportPage({
         }
 
         setReport(data.report);
+
+        // Fetch bounty data
+        const bountyRes = await fetch(`/api/reports/${id}/bounty`);
+        if (bountyRes.ok) {
+          const bountyData = await bountyRes.json();
+          setBountyData(bountyData);
+        }
       } catch {
         setError("Network error. Please try again.");
       } finally {
@@ -146,158 +134,209 @@ export default function ReportPage({
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-        <div className="text-gray-500 font-mono">LOADING...</div>
+      <div className="min-h-screen py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="skeleton h-64 rounded-lg mb-6" />
+          <div className="skeleton h-32 rounded-lg mb-6" />
+          <div className="skeleton h-48 rounded-lg" />
+        </div>
       </div>
     );
   }
 
   if (error || !report) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-        <div className="text-red-400 font-mono mb-4">{error || "Report not found"}</div>
-        <button
-          onClick={() => router.push("/")}
-          className="text-gray-500 hover:text-white font-mono text-sm"
-        >
-          &larr; BACK TO BOARD
-        </button>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <span className="text-6xl mb-4 block">&#x1F6AB;</span>
+          <h1 className="text-2xl font-bold text-[var(--red-primary)] mb-4">
+            {error || "Report Not Found"}
+          </h1>
+          <p className="text-[var(--foreground-muted)] mb-6">
+            This report may have been removed or never existed.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            className="btn-primary"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     );
   }
 
-  const threat = getThreatLevel(report.confirmCount);
-
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Back link */}
-      <button
-        onClick={() => router.push("/")}
-        className="text-gray-500 hover:text-white font-mono text-sm mb-6 block"
-      >
-        &larr; BACK TO BOARD
-      </button>
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Back link */}
+        <button
+          onClick={() => router.back()}
+          className="text-[var(--foreground-muted)] hover:text-[var(--foreground)] text-sm mb-6 block transition-colors"
+        >
+          &larr; Back
+        </button>
 
-      {/* Report header */}
-      <div className="bg-[#0d0d12] border border-gray-800 p-6 mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          {/* Type badge */}
-          <span
-            className={`px-2 py-0.5 text-xs font-mono uppercase ${
-              report.type === "deployer"
-                ? "bg-purple-500/20 text-purple-400 border border-purple-500/50"
-                : "bg-blue-500/20 text-blue-400 border border-blue-500/50"
-            }`}
-          >
-            {report.type}
-          </span>
+        {/* Report header */}
+        <div className="card p-6 mb-6">
+          <div className="flex flex-col md:flex-row items-start gap-6">
+            <ScammerAvatar identifier={report.identifier} size="xl" />
 
-          {/* Threat level */}
-          <span
-            className={`px-2 py-0.5 text-xs font-mono border ${threat.bgColor} ${threat.color}`}
-          >
-            {threat.label} THREAT
-          </span>
-        </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 flex-wrap mb-2">
+                <span
+                  className={`badge ${
+                    report.type === "deployer" ? "badge-purple" : "badge-success"
+                  }`}
+                >
+                  {report.type}
+                </span>
+                <ThreatBadge confirmCount={report.confirmCount} size="md" />
+                {bountyData && bountyData.count > 0 && (
+                  <BountyBadge count={bountyData.count} />
+                )}
+              </div>
 
-        {/* Identifier */}
-        <h1 className="text-2xl font-mono text-white mb-4 break-all">
-          {report.type === "twitter" ? `@${report.identifier}` : report.identifier}
-        </h1>
+              {/* Identifier */}
+              <h1 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] mb-2 break-all">
+                {report.type === "twitter" ? "@" : ""}
+                {report.identifier}
+              </h1>
 
-        {/* Reason */}
-        <div className="mb-4">
-          <h2 className="text-sm text-gray-500 font-mono mb-2">REASON</h2>
-          <p className="text-gray-300 font-mono whitespace-pre-wrap">
-            {report.reason}
-          </p>
-        </div>
+              {/* Roast Title */}
+              {report.roastTitle && (
+                <p className="roast-title text-xl mb-4 animate-gold-shimmer text-transparent bg-clip-text">
+                  {report.roastTitle}
+                </p>
+              )}
 
-        {/* Evidence */}
-        {report.evidence && (
-          <div className="mb-4">
-            <h2 className="text-sm text-gray-500 font-mono mb-2">EVIDENCE</h2>
-            <a
-              href={report.evidence}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline font-mono text-sm break-all"
+              {/* Meta */}
+              <div className="flex items-center gap-4 text-sm text-[var(--foreground-muted)]">
+                <span>
+                  Reported by{" "}
+                  <Link
+                    href={`/profile/${report.authorNickname}`}
+                    className="text-[var(--green-primary)] hover:underline"
+                  >
+                    @{report.authorNickname}
+                  </Link>
+                </span>
+                <span>{formatDistanceToNow(new Date(report.createdAt))}</span>
+              </div>
+            </div>
+
+            {/* View scammer profile */}
+            <Link
+              href={`/scammer/${encodeURIComponent(report.identifier)}`}
+              className="btn-secondary text-sm py-2 px-4 flex-shrink-0"
             >
-              {report.evidence}
-            </a>
+              View Full Profile
+            </Link>
           </div>
-        )}
-
-        {/* Meta */}
-        <div className="flex items-center gap-4 text-xs font-mono text-gray-600 border-t border-gray-800 pt-4 mt-4">
-          <span>
-            Reported by{" "}
-            <span className="text-green-500">@{report.authorNickname}</span>
-          </span>
-          <span>{formatDistanceToNow(new Date(report.createdAt))}</span>
         </div>
-      </div>
 
-      {/* Confirm section */}
-      <div className="bg-[#0d0d12] border border-gray-800 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <span className="text-3xl font-bold text-red-400 font-mono">
-              {report.confirmCount}
-            </span>
-            <span className="text-gray-500 font-mono ml-2">CONFIRMS</span>
+        {/* Reason & Evidence */}
+        <div className="card p-6 mb-6">
+          <h2 className="text-lg font-bold text-[var(--foreground)] mb-4">
+            &#x1F4DD; Report Details
+          </h2>
+          <div className="mb-4">
+            <h3 className="text-sm text-[var(--foreground-muted)] mb-2">Reason</h3>
+            <p className="text-[var(--foreground)] whitespace-pre-wrap">
+              {report.reason}
+            </p>
           </div>
-          {report.userHasConfirmed && (
-            <span className="text-green-400 font-mono text-sm">
-              YOU CONFIRMED THIS
-            </span>
+
+          {report.evidence && (
+            <div>
+              <h3 className="text-sm text-[var(--foreground-muted)] mb-2">Evidence</h3>
+              <a
+                href={report.evidence}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--cyan-primary)] hover:underline break-all"
+              >
+                {report.evidence}
+              </a>
+            </div>
           )}
         </div>
 
-        {session ? (
-          <>
-            <TurnstileWidget
-              onVerify={setTurnstileToken}
-              onExpire={() => setTurnstileToken("")}
-            />
+        {/* Confirm section */}
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <span className="text-4xl font-bold text-[var(--red-primary)]">
+                {report.confirmCount}
+              </span>
+              <div>
+                <div className="text-[var(--foreground)]">Confirms</div>
+                {report.userHasConfirmed && (
+                  <div className="text-sm text-[var(--green-primary)]">
+                    &#x2705; You confirmed this
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
-            {confirmError && (
-              <p className="text-red-400 font-mono text-sm mb-3">{confirmError}</p>
-            )}
+          {session ? (
+            <>
+              <TurnstileWidget
+                onVerify={setTurnstileToken}
+                onExpire={() => setTurnstileToken("")}
+              />
 
-            <button
-              onClick={handleConfirm}
-              disabled={!turnstileToken || isConfirming}
-              className={`w-full py-3 font-mono text-sm transition-colors ${
-                report.userHasConfirmed
-                  ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                  : "bg-red-600 hover:bg-red-700 text-white"
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {isConfirming
-                ? "PROCESSING..."
-                : report.userHasConfirmed
-                ? "REMOVE CONFIRM"
-                : "CONFIRM SCAMMER"}
-            </button>
-          </>
-        ) : (
-          <p className="text-gray-500 font-mono text-sm">
-            <a href="/login" className="text-green-400 hover:underline">
-              Login
-            </a>{" "}
-            to confirm this report.
-          </p>
-        )}
-      </div>
+              {confirmError && (
+                <p className="text-[var(--red-primary)] text-sm mb-3">{confirmError}</p>
+              )}
 
-      {/* Comments */}
-      <div className="bg-[#0d0d12] border border-gray-800 p-6">
-        <CommentThread
-          reportId={report.id}
-          comments={report.comments}
-          onCommentAdded={handleCommentAdded}
-        />
+              <button
+                onClick={handleConfirm}
+                disabled={!turnstileToken || isConfirming}
+                className={`w-full py-3 rounded font-medium transition-all ${
+                  report.userHasConfirmed
+                    ? "bg-[var(--background-tertiary)] text-[var(--foreground-muted)] hover:bg-[var(--background-card)]"
+                    : "btn-primary"
+                } disabled:opacity-50 disabled:cursor-not-allowed ${
+                  !report.userHasConfirmed && turnstileToken ? "animate-pulse-red" : ""
+                }`}
+              >
+                {isConfirming
+                  ? "Processing..."
+                  : report.userHasConfirmed
+                  ? "Remove Confirm"
+                  : "&#x1F525; CONFIRM SCAMMER"}
+              </button>
+            </>
+          ) : (
+            <p className="text-[var(--foreground-muted)]">
+              <Link href="/login" className="text-[var(--green-primary)] hover:underline">
+                Login
+              </Link>{" "}
+              to confirm this report.
+            </p>
+          )}
+        </div>
+
+        {/* Roast Section */}
+        <div className="mb-6">
+          <RoastSection reportId={report.id} identifier={report.identifier} />
+        </div>
+
+        {/* Comments */}
+        <div className="card p-6">
+          <CommentThread
+            reportId={report.id}
+            comments={report.comments}
+            onCommentAdded={handleCommentAdded}
+          />
+        </div>
+
+        {/* Shame message */}
+        <div className="text-center mt-8">
+          <ShameMessage />
+        </div>
       </div>
     </div>
   );

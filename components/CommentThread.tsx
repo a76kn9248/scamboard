@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
 import TurnstileWidget from "./TurnstileWidget";
 
@@ -62,31 +63,35 @@ export default function CommentThread({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-mono text-white border-b border-gray-800 pb-2">
-        COMMENTS ({comments.length})
+      <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+        <span>&#x1F4AC;</span>
+        Comments ({comments.length})
       </h3>
 
       {/* Comment list */}
       <div className="space-y-3">
         {comments.length === 0 ? (
-          <p className="text-gray-600 font-mono text-sm">
+          <p className="text-[var(--foreground-muted)] text-sm text-center py-4">
             No comments yet. Be the first to add intel.
           </p>
         ) : (
           comments.map((comment) => (
             <div
               key={comment.id}
-              className="bg-[#0d0d12] border border-gray-800 p-3"
+              className="bg-[var(--background-tertiary)] rounded-lg p-4 animate-fade-in"
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-green-400 font-mono text-sm">
+                <Link
+                  href={`/profile/${comment.authorNickname}`}
+                  className="text-[var(--green-primary)] text-sm hover:underline"
+                >
                   @{comment.authorNickname}
-                </span>
-                <span className="text-gray-600 font-mono text-xs">
+                </Link>
+                <span className="text-[var(--foreground-dimmed)] text-xs">
                   {formatDistanceToNow(new Date(comment.createdAt))}
                 </span>
               </div>
-              <p className="text-gray-300 font-mono text-sm whitespace-pre-wrap">
+              <p className="text-[var(--foreground)] text-sm whitespace-pre-wrap">
                 {comment.text}
               </p>
             </div>
@@ -96,17 +101,17 @@ export default function CommentThread({
 
       {/* Add comment form */}
       {session ? (
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3 pt-4 border-t border-[var(--border)]">
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Add intel or evidence..."
             maxLength={500}
             rows={3}
-            className="w-full bg-[#12121a] border border-gray-800 focus:border-green-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none resize-none transition-colors"
+            className="input resize-none"
           />
           <div className="flex items-center justify-between">
-            <span className="text-gray-600 font-mono text-xs">
+            <span className="text-[var(--foreground-dimmed)] text-xs">
               {text.length}/500
             </span>
           </div>
@@ -117,22 +122,22 @@ export default function CommentThread({
           />
 
           {error && (
-            <p className="text-red-400 font-mono text-sm">{error}</p>
+            <p className="text-[var(--red-primary)] text-sm">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={!text.trim() || !turnstileToken || isSubmitting}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-6 py-2 font-mono text-sm transition-colors"
+            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "POSTING..." : "POST COMMENT"}
+            {isSubmitting ? "Posting..." : "Post Comment"}
           </button>
         </form>
       ) : (
-        <p className="text-gray-500 font-mono text-sm">
-          <a href="/login" className="text-green-400 hover:underline">
+        <p className="text-[var(--foreground-muted)] text-sm pt-4 border-t border-[var(--border)]">
+          <Link href="/login" className="text-[var(--green-primary)] hover:underline">
             Login
-          </a>{" "}
+          </Link>{" "}
           to add a comment.
         </p>
       )}

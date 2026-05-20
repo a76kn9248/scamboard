@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
+import ThreatBadge from "./ThreatBadge";
+import ScammerAvatar from "./ScammerAvatar";
+import BountyBadge from "./BountyBadge";
+import { getThreatLevel } from "@/lib/threat-levels";
 
 interface ReportCardProps {
   report: {
@@ -14,39 +18,8 @@ interface ReportCardProps {
     commentCount: number;
     createdAt: string;
     rank: number;
-  };
-}
-
-function getThreatLevel(confirms: number): {
-  label: string;
-  color: string;
-  bgColor: string;
-} {
-  if (confirms >= 20) {
-    return {
-      label: "EXTREME",
-      color: "text-red-400",
-      bgColor: "bg-red-500/20 border-red-500/50",
-    };
-  }
-  if (confirms >= 10) {
-    return {
-      label: "HIGH",
-      color: "text-orange-400",
-      bgColor: "bg-orange-500/20 border-orange-500/50",
-    };
-  }
-  if (confirms >= 5) {
-    return {
-      label: "MEDIUM",
-      color: "text-yellow-400",
-      bgColor: "bg-yellow-500/20 border-yellow-500/50",
-    };
-  }
-  return {
-    label: "LOW",
-    color: "text-gray-400",
-    bgColor: "bg-gray-500/20 border-gray-500/50",
+    roastTitle?: string | null;
+    bountyCount?: number;
   };
 }
 
@@ -61,69 +34,97 @@ function truncateIdentifier(identifier: string, type: string): string {
 }
 
 export default function ReportCard({ report }: ReportCardProps) {
-  const threat = getThreatLevel(report.confirmCount);
+  const threatInfo = getThreatLevel(report.confirmCount);
 
   return (
     <Link href={`/report/${report.id}`}>
-      <div className="bg-[#0d0d12] border border-gray-800 hover:border-red-900/50 p-4 transition-all cursor-pointer group">
+      <div
+        className={`card p-4 hover-glow transition-all cursor-pointer group ${
+          threatInfo.animated ? "animate-border-glow" : ""
+        }`}
+      >
         <div className="flex items-start gap-4">
-          {/* Rank */}
-          <div className="text-2xl font-bold text-gray-700 font-mono w-8 text-right">
-            #{report.rank}
+          {/* Rank & Avatar */}
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className={`text-2xl font-black ${
+                report.rank === 1
+                  ? "text-[var(--gold-primary)]"
+                  : report.rank === 2
+                  ? "text-gray-300"
+                  : report.rank === 3
+                  ? "text-amber-600"
+                  : "text-[var(--red-primary)]"
+              }`}
+            >
+              #{report.rank}
+            </div>
+            <ScammerAvatar identifier={report.identifier} size="sm" />
           </div>
 
           {/* Main content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               {/* Type badge */}
               <span
-                className={`px-2 py-0.5 text-xs font-mono uppercase ${
-                  report.type === "deployer"
-                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/50"
-                    : "bg-blue-500/20 text-blue-400 border border-blue-500/50"
+                className={`badge ${
+                  report.type === "deployer" ? "badge-purple" : "badge-success"
                 }`}
               >
                 {report.type}
               </span>
 
               {/* Threat level */}
-              <span
-                className={`px-2 py-0.5 text-xs font-mono border ${threat.bgColor} ${threat.color}`}
-              >
-                {threat.label}
-              </span>
+              <ThreatBadge confirmCount={report.confirmCount} size="sm" />
+
+              {/* Bounty badge */}
+              {report.bountyCount && report.bountyCount > 0 && (
+                <BountyBadge count={report.bountyCount} />
+              )}
             </div>
 
             {/* Identifier */}
-            <div className="text-lg font-mono text-white group-hover:text-red-400 transition-colors mb-2 truncate">
+            <div className="text-lg font-bold text-[var(--foreground)] group-hover:text-[var(--red-primary)] transition-colors mb-1 truncate">
               {truncateIdentifier(report.identifier, report.type)}
             </div>
 
+            {/* Roast Title */}
+            {report.roastTitle && (
+              <p className="roast-title text-sm mb-2 line-clamp-1">
+                {report.roastTitle}
+              </p>
+            )}
+
             {/* Reason preview */}
-            <p className="text-gray-500 text-sm font-mono line-clamp-2 mb-3">
+            <p className="text-[var(--foreground-muted)] text-sm line-clamp-2 mb-3">
               {report.reason}
             </p>
 
             {/* Meta */}
-            <div className="flex items-center gap-4 text-xs font-mono text-gray-600">
-              <span className="text-green-500">@{report.authorNickname}</span>
+            <div className="flex items-center gap-4 text-xs text-[var(--foreground-dimmed)]">
+              <Link
+                href={`/profile/${report.authorNickname}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-[var(--green-primary)] hover:underline"
+              >
+                @{report.authorNickname}
+              </Link>
               <span>{formatDistanceToNow(new Date(report.createdAt))}</span>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <div className="flex items-center gap-1">
-              <span className="text-red-400 font-mono text-lg font-bold">
-                {report.confirmCount}
+              <span className="text-[var(--red-primary)] text-lg font-bold">
+                {threatInfo.fireEmojis || "\u{1F525}"} {report.confirmCount}
               </span>
-              <span className="text-gray-600 text-xs font-mono">CONFIRMS</span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-gray-400 font-mono">
-                {report.commentCount}
+            <span className="text-xs text-[var(--foreground-dimmed)]">confirms</span>
+            <div className="flex items-center gap-1 mt-2">
+              <span className="text-[var(--foreground-muted)]">
+                &#x1F4AC; {report.commentCount}
               </span>
-              <span className="text-gray-600 text-xs font-mono">COMMENTS</span>
             </div>
           </div>
         </div>

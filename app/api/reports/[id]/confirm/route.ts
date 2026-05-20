@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { awardXP, XP_REWARDS } from "@/lib/xp";
 
 export const dynamic = "force-dynamic";
 
@@ -92,10 +93,15 @@ export async function POST(
         where: { reportId },
       });
 
+      // Award XP for confirming
+      const xpResult = await awardXP(session.user.id, XP_REWARDS.CONFIRM_SCAMMER);
+
       return NextResponse.json({
         message: "Report confirmed",
         confirmed: true,
         confirmCount: newCount,
+        xpAwarded: XP_REWARDS.CONFIRM_SCAMMER,
+        newTitle: xpResult.newTitle,
       });
     }
   } catch (error) {

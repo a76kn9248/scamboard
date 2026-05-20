@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeInput, validateIdentifier } from "@/lib/validation";
+import { awardXP, XP_REWARDS } from "@/lib/xp";
 
 export const dynamic = "force-dynamic";
 
@@ -171,6 +172,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Award XP for submitting a report
+    const xpResult = await awardXP(session.user.id, XP_REWARDS.SUBMIT_REPORT);
+
     return NextResponse.json(
       {
         message: "Report created successfully",
@@ -183,6 +187,8 @@ export async function POST(request: NextRequest) {
           authorNickname: report.author.nickname,
           createdAt: report.createdAt,
         },
+        xpAwarded: XP_REWARDS.SUBMIT_REPORT,
+        newTitle: xpResult.newTitle,
       },
       { status: 201 }
     );

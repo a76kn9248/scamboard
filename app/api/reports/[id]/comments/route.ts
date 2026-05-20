@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeInput } from "@/lib/validation";
+import { awardXP, XP_REWARDS } from "@/lib/xp";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,9 @@ export async function POST(
       },
     });
 
+    // Award XP for commenting
+    const xpResult = await awardXP(session.user.id, XP_REWARDS.LEAVE_COMMENT);
+
     return NextResponse.json(
       {
         message: "Comment added",
@@ -99,6 +103,8 @@ export async function POST(
           authorNickname: comment.user.nickname,
           createdAt: comment.createdAt,
         },
+        xpAwarded: XP_REWARDS.LEAVE_COMMENT,
+        newTitle: xpResult.newTitle,
       },
       { status: 201 }
     );

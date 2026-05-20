@@ -8,28 +8,39 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  nickname  String    @unique
-  createdAt DateTime  @default(now())
-  reports   Report[]
-  confirms  Confirm[]
-  comments  Comment[]
+  id           String      @id @default(cuid())
+  email        String      @unique
+  password     String
+  nickname     String      @unique
+  bio          String?     @default("")
+  profileColor String?     @default("#ff1744")
+  title        String?     @default("Fresh Degen")
+  xp           Int         @default(0)
+  createdAt    DateTime    @default(now())
+  reports      Report[]
+  confirms     Confirm[]
+  comments     Comment[]
+  roastVotes   RoastVote[]
+  roasts       Roast[]
+  bounties     Bounty[]
 }
 
 model Report {
-  id         String    @id @default(cuid())
-  type       String    // "deployer" or "twitter"
-  identifier String    // wallet address or twitter handle
-  reason     String
-  evidence   String?
-  author     User      @relation(fields: [authorId], references: [id])
-  authorId   String
-  confirms   Confirm[]
-  comments   Comment[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  type        String    // "deployer" or "twitter"
+  identifier  String    // wallet address or twitter handle
+  reason      String
+  evidence    String?
+  author      User      @relation(fields: [authorId], references: [id])
+  authorId    String
+  confirms    Confirm[]
+  comments    Comment[]
+  roasts      Roast[]
+  bounties    Bounty[]
+  shameLocked Boolean   @default(false)
+  roastTitle  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([identifier])
   @@index([createdAt])
@@ -54,4 +65,38 @@ model Comment {
   report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
   reportId  String
   createdAt DateTime @default(now())
+}
+
+model Roast {
+  id        String      @id @default(cuid())
+  text      String      // max 60 chars - the roast title
+  author    User        @relation(fields: [authorId], references: [id])
+  authorId  String
+  report    Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId  String
+  votes     RoastVote[]
+  createdAt DateTime    @default(now())
+}
+
+model RoastVote {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  roast     Roast    @relation(fields: [roastId], references: [id], onDelete: Cascade)
+  roastId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, roastId])
+}
+
+model Bounty {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId  String
+  message   String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reportId])
 }

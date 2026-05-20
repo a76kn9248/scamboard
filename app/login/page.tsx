@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ShameMessage from "@/components/ShameMessage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -39,65 +40,76 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <div className="bg-[#0d0d12] border border-gray-800 p-8">
-        <h1 className="text-2xl font-bold text-red-500 mb-2 text-center">
-          LOGIN
-        </h1>
-        <p className="text-gray-500 font-mono text-sm text-center mb-8">
-          Access your SCAMBOARD account
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              EMAIL
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-red-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-            />
+    <div className="min-h-screen flex items-center justify-center px-4 py-16">
+      <div className="w-full max-w-md">
+        <div className="card p-8">
+          <div className="text-center mb-8">
+            <span className="text-4xl mb-4 block">&#x2620;</span>
+            <h1 className="text-2xl font-bold text-[var(--red-primary)] mb-2">
+              LOGIN
+            </h1>
+            <p className="text-[var(--foreground-muted)] text-sm">
+              Access your SCAMBOARD account
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-500 font-mono mb-2">
-              PASSWORD
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full bg-[#12121a] border border-gray-800 focus:border-red-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-            />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="input"
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <p className="text-[var(--red-primary)] text-sm">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <span className="text-[var(--foreground-muted)] text-sm">
+              No account?{" "}
+            </span>
+            <Link
+              href="/register"
+              className="text-[var(--green-primary)] hover:underline text-sm"
+            >
+              Register
+            </Link>
           </div>
-
-          {error && (
-            <p className="text-red-400 font-mono text-sm">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3 font-mono text-sm transition-colors"
-          >
-            {isLoading ? "LOGGING IN..." : "LOGIN"}
-          </button>
-        </form>
+        </div>
 
         <div className="mt-6 text-center">
-          <span className="text-gray-600 font-mono text-sm">
-            No account?{" "}
-          </span>
-          <Link
-            href="/register"
-            className="text-green-400 hover:underline font-mono text-sm"
-          >
-            REGISTER
-          </Link>
+          <ShameMessage />
         </div>
       </div>
     </div>

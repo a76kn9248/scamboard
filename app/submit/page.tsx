@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import ShameMessage from "@/components/ShameMessage";
+import ThreatBadge from "@/components/ThreatBadge";
+import ScammerAvatar from "@/components/ScammerAvatar";
 
 export default function SubmitPage() {
   const { data: session, status } = useSession();
@@ -19,25 +23,35 @@ export default function SubmitPage() {
 
   if (status === "loading") {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8 text-center">
-        <div className="text-gray-500 font-mono">LOADING...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">&#x2620;</div>
+          <ShameMessage />
+        </div>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold text-red-500 mb-4">ACCESS DENIED</h1>
-        <p className="text-gray-500 font-mono mb-4">
-          You must be logged in to submit a report.
-        </p>
-        <a
-          href="/login"
-          className="text-green-400 hover:underline font-mono"
-        >
-          LOGIN
-        </a>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <span className="text-6xl mb-4 block">&#x1F512;</span>
+          <h1 className="text-2xl font-bold text-[var(--red-primary)] mb-4">
+            ACCESS DENIED
+          </h1>
+          <p className="text-[var(--foreground-muted)] mb-6">
+            You must be logged in to report a scammer.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Link href="/login" className="btn-primary">
+              Login
+            </Link>
+            <Link href="/register" className="btn-secondary">
+              Register
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -81,115 +95,192 @@ export default function SubmitPage() {
     }
   };
 
+  // Display identifier for preview
+  const displayIdentifier = type === "twitter" && identifier && !identifier.startsWith("@")
+    ? `@${identifier}`
+    : identifier || (type === "twitter" ? "@username" : "0x...");
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-red-500 mb-2">REPORT SCAMMER</h1>
-      <p className="text-gray-500 font-mono text-sm mb-8">
-        Submit a deployer wallet address or Twitter handle. Provide evidence and
-        let the community verify.
-      </p>
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Form */}
+          <div>
+            <div className="mb-8">
+              <h1 className="text-3xl font-black text-[var(--red-primary)] mb-2">
+                &#x1F6A9; REPORT SCAMMER
+              </h1>
+              <p className="text-[var(--foreground-muted)]">
+                Another scammer? Let&apos;s get &apos;em.
+              </p>
+              <div className="mt-2">
+                <ShameMessage />
+              </div>
+            </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Type toggle */}
-        <div>
-          <label className="block text-sm text-gray-500 font-mono mb-2">
-            TYPE
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setType("deployer")}
-              className={`flex-1 py-3 font-mono text-sm transition-colors ${
-                type === "deployer"
-                  ? "bg-purple-500/20 text-purple-400 border border-purple-500"
-                  : "bg-[#12121a] text-gray-500 border border-gray-800 hover:border-gray-600"
-              }`}
-            >
-              DEPLOYER
-            </button>
-            <button
-              type="button"
-              onClick={() => setType("twitter")}
-              className={`flex-1 py-3 font-mono text-sm transition-colors ${
-                type === "twitter"
-                  ? "bg-blue-500/20 text-blue-400 border border-blue-500"
-                  : "bg-[#12121a] text-gray-500 border border-gray-800 hover:border-gray-600"
-              }`}
-            >
-              TWITTER
-            </button>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Type toggle */}
+              <div>
+                <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                  Type
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setType("deployer")}
+                    className={`flex-1 py-3 rounded text-sm transition-colors ${
+                      type === "deployer"
+                        ? "bg-[rgba(170,0,255,0.2)] text-[var(--purple-primary)] border border-[var(--purple-primary)]"
+                        : "bg-[var(--background-card)] text-[var(--foreground-muted)] border border-[var(--border)] hover:border-[var(--border-hover)]"
+                    }`}
+                  >
+                    &#x1F4B0; DEPLOYER
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType("twitter")}
+                    className={`flex-1 py-3 rounded text-sm transition-colors ${
+                      type === "twitter"
+                        ? "bg-[rgba(41,121,255,0.2)] text-[var(--blue-primary)] border border-[var(--blue-primary)]"
+                        : "bg-[var(--background-card)] text-[var(--foreground-muted)] border border-[var(--border)] hover:border-[var(--border-hover)]"
+                    }`}
+                  >
+                    &#x1F426; TWITTER
+                  </button>
+                </div>
+              </div>
+
+              {/* Identifier */}
+              <div>
+                <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                  {type === "deployer" ? "Wallet Address" : "Twitter Handle"}
+                </label>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder={
+                    type === "deployer"
+                      ? "0x... or Solana address"
+                      : "@scammer_handle"
+                  }
+                  className="input"
+                />
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                  Reason / Description
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Describe the scam. What happened? Who was affected? Be specific."
+                  rows={5}
+                  className="input resize-none"
+                />
+                <div className="text-right text-xs text-[var(--foreground-dimmed)] mt-1">
+                  {reason.length}/2000
+                </div>
+              </div>
+
+              {/* Evidence */}
+              <div>
+                <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                  Evidence URL (optional)
+                </label>
+                <input
+                  type="url"
+                  value={evidence}
+                  onChange={(e) => setEvidence(e.target.value)}
+                  placeholder="https://twitter.com/... or archive link"
+                  className="input"
+                />
+              </div>
+
+              {/* Turnstile */}
+              <TurnstileWidget
+                onVerify={setTurnstileToken}
+                onExpire={() => setTurnstileToken("")}
+              />
+
+              {/* Error */}
+              {error && (
+                <p className="text-[var(--red-primary)] text-sm">{error}</p>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={!identifier || !reason || !turnstileToken || isSubmitting}
+                className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? "SUBMITTING..." : "&#x1F6A9; SUBMIT REPORT"}
+              </button>
+            </form>
+          </div>
+
+          {/* Preview */}
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <h2 className="text-lg font-bold text-[var(--foreground)] mb-4">
+              Preview
+            </h2>
+            <div className="card p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-2xl font-black text-[var(--foreground-dimmed)]">
+                    #?
+                  </div>
+                  <ScammerAvatar
+                    identifier={identifier || "preview"}
+                    size="sm"
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span
+                      className={`badge ${
+                        type === "deployer" ? "badge-purple" : "badge-success"
+                      }`}
+                    >
+                      {type}
+                    </span>
+                    <ThreatBadge confirmCount={0} size="sm" />
+                  </div>
+
+                  <div className="text-lg font-bold text-[var(--foreground)] mb-2 truncate">
+                    {displayIdentifier}
+                  </div>
+
+                  <p className="text-[var(--foreground-muted)] text-sm line-clamp-3 mb-3">
+                    {reason || "Your reason will appear here..."}
+                  </p>
+
+                  <div className="flex items-center gap-4 text-xs text-[var(--foreground-dimmed)]">
+                    <span className="text-[var(--green-primary)]">
+                      @{session.user.name}
+                    </span>
+                    <span>just now</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <span className="text-[var(--red-primary)] text-lg font-bold">
+                    &#x1F525; 0
+                  </span>
+                  <span className="text-xs text-[var(--foreground-dimmed)]">confirms</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-[var(--foreground-dimmed)] mt-4 text-center">
+              This is how your report will appear on the board.
+            </p>
           </div>
         </div>
-
-        {/* Identifier */}
-        <div>
-          <label className="block text-sm text-gray-500 font-mono mb-2">
-            {type === "deployer" ? "WALLET ADDRESS" : "TWITTER HANDLE"}
-          </label>
-          <input
-            type="text"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={
-              type === "deployer"
-                ? "0x... or Solana address"
-                : "@scammer_handle"
-            }
-            className="w-full bg-[#12121a] border border-gray-800 focus:border-red-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-          />
-        </div>
-
-        {/* Reason */}
-        <div>
-          <label className="block text-sm text-gray-500 font-mono mb-2">
-            REASON / DESCRIPTION
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Describe the scam. What happened? Who was affected? Be specific."
-            rows={5}
-            className="w-full bg-[#12121a] border border-gray-800 focus:border-red-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none resize-none transition-colors"
-          />
-          <div className="text-right text-gray-600 font-mono text-xs mt-1">
-            {reason.length}/2000
-          </div>
-        </div>
-
-        {/* Evidence */}
-        <div>
-          <label className="block text-sm text-gray-500 font-mono mb-2">
-            EVIDENCE URL (optional)
-          </label>
-          <input
-            type="url"
-            value={evidence}
-            onChange={(e) => setEvidence(e.target.value)}
-            placeholder="https://twitter.com/... or archive link"
-            className="w-full bg-[#12121a] border border-gray-800 focus:border-red-500 px-4 py-3 font-mono text-sm text-white placeholder-gray-600 outline-none transition-colors"
-          />
-        </div>
-
-        {/* Turnstile */}
-        <TurnstileWidget
-          onVerify={setTurnstileToken}
-          onExpire={() => setTurnstileToken("")}
-        />
-
-        {/* Error */}
-        {error && (
-          <p className="text-red-400 font-mono text-sm">{error}</p>
-        )}
-
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={!identifier || !reason || !turnstileToken || isSubmitting}
-          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-3 font-mono text-sm transition-colors"
-        >
-          {isSubmitting ? "SUBMITTING..." : "SUBMIT REPORT"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }
