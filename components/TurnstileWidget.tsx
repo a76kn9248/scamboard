@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
   onExpire?: () => void;
 }
 
+const TURNSTILE_SITE_KEY = "0x4AAAAAADS3qFBQQaCV3kc4";
+
 declare global {
   interface Window {
-    turnstile: {
+    turnstile?: {
       render: (
         container: HTMLElement,
         options: {
           sitekey: string;
           callback: (token: string) => void;
           "expired-callback"?: () => void;
+          "error-callback"?: (error: unknown) => void;
           theme?: "light" | "dark";
         }
       ) => string;
@@ -32,58 +35,121 @@ export default function TurnstileWidget({
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const tokenReceivedRef = useRef(false);
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  onVerifyRef.current = onVerify;
+  onExpireRef.current = onExpire;
 
-    if (!siteKey) {
-      console.error("Turnstile site key not configured");
+  const renderWidget = useCallback(() => {
+    if (!containerRef.current || !window.turnstile || widgetIdRef.current) {
       return;
     }
 
-    const renderWidget = () => {
-      if (containerRef.current && window.turnstile && !widgetIdRef.current) {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          callback: onVerify,
-          "expired-callback": onExpire,
-          theme: "dark",
-        });
-      }
-    };
+    try {
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token: string) => {
+          if (tokenReceivedRef.current) return;
+          tokenReceivedRef.current = true;
+          setError(null);
+          onVerifyRef.current(token);
+        },
+        "expired-callback": () => {
+          tokenReceivedRef.current = false;
+          onExpireRef.current?.();
+        },
+        "error-callback": () => {
+          setError("Verification failed");
+        },
+        theme: "dark",
+      });
+      setLoading(false);
+    } catch {
+      setError("Failed to render widget");
+      setLoading(false);
+    }
+  }, []);
 
-    // Check if turnstile is already loaded
+  const handleRetry = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    tokenReceivedRef.current = false;
+
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+      setLoading(false);
+    } else {
+      widgetIdRef.current = null;
+      renderWidget();
+    }
+  }, [renderWidget]);
+
+  useEffect(() => {
     if (window.turnstile) {
       renderWidget();
-    } else {
-      // Load the script if not present
-      const existingScript = document.querySelector(
-        'script[src*="turnstile"]'
-      );
-      if (!existingScript) {
-        const script = document.createElement("script");
-        script.src =
-          "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
-        script.async = true;
-        window.onTurnstileLoad = renderWidget;
-        document.head.appendChild(script);
-      } else {
-        window.onTurnstileLoad = renderWidget;
-      }
+      return;
     }
+
+    const existingScript = document.querySelector(
+      "script[src*=\"challenges.cloudflare.com/turnstile\"]"
+    );
+
+    if (existingScript) {
+      window.onTurnstileLoad = renderWidget;
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
+    script.async = true;
+
+    script.onerror = () => {
+      setError("Failed to load verification");
+      setLoading(false);
+    };
+
+    window.onTurnstileLoad = renderWidget;
+    document.head.appendChild(script);
 
     return () => {
       if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          // Ignore cleanup errors
+        }
         widgetIdRef.current = null;
       }
     };
-  }, [onVerify, onExpire]);
+  }, [renderWidget]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center my-4 p-4 border border-red-500/50 rounded">
+        <p className="text-red-400 text-sm mb-2">{error}</p>
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="text-sm text-[var(--green-primary)] hover:underline"
+        >
+          Click to retry
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className="flex justify-center my-4"
-    />
+    <div className="flex flex-col items-center justify-center my-4">
+      {loading && (
+        <p className="text-[var(--foreground-muted)] text-sm mb-2">
+          Loading verification...
+        </p>
+      )}
+      <div ref={containerRef} />
+    </div>
   );
 }
