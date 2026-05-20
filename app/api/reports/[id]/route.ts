@@ -22,8 +22,9 @@ export async function GET(
         comments: {
           include: {
             user: {
-              select: { nickname: true },
+              select: { id: true, nickname: true, profileColor: true },
             },
+            votes: true,
           },
           orderBy: { createdAt: "asc" },
         },
@@ -63,12 +64,23 @@ export async function GET(
         userHasConfirmed,
         createdAt: report.createdAt,
         updatedAt: report.updatedAt,
-        comments: report.comments.map((comment) => ({
-          id: comment.id,
-          text: comment.text,
-          authorNickname: comment.user.nickname,
-          createdAt: comment.createdAt,
-        })),
+        comments: report.comments.map((comment) => {
+          const score = comment.votes.reduce((acc, v) => acc + v.value, 0);
+          const userVote = session?.user?.id
+            ? comment.votes.find((v) => v.userId === session.user.id)?.value ?? 0
+            : 0;
+          return {
+            id: comment.id,
+            text: comment.text,
+            authorId: comment.user.id,
+            authorNickname: comment.user.nickname,
+            authorColor: comment.user.profileColor,
+            parentId: comment.parentId,
+            score,
+            userVote,
+            createdAt: comment.createdAt,
+          };
+        }),
       },
     });
   } catch (error) {
