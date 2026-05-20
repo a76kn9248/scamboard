@@ -5,6 +5,49 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { topWatchdogIds: true },
+    });
+
+    if (!user || user.topWatchdogIds.length === 0) {
+      return NextResponse.json({ watchdogs: [] });
+    }
+
+    const watchdogs = await prisma.user.findMany({
+      where: { id: { in: user.topWatchdogIds } },
+      select: {
+        id: true,
+        nickname: true,
+        profileColor: true,
+        title: true,
+        mood: true,
+      },
+    });
+
+    // Preserve order from topWatchdogIds
+    const orderedWatchdogs = user.topWatchdogIds
+      .map((id) => watchdogs.find((w) => w.id === id))
+      .filter(Boolean);
+
+    return NextResponse.json({ watchdogs: orderedWatchdogs });
+  } catch (error) {
+    console.error("Error fetching top 8:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

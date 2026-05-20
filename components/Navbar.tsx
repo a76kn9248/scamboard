@@ -1,19 +1,89 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+interface SearchResult {
+  id: string;
+  type: string;
+  identifier: string;
+  reason: string;
+  authorNickname: string;
+}
 
 export default function Navbar() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userInfo, setUserInfo] = useState<{
     title: string;
     xp: number;
     profileColor: string;
   } | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced search
+  const performSearch = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/reports?search=${encodeURIComponent(query)}&limit=5`);
+      const data = await res.json();
+      setSearchResults(data.reports || []);
+      setShowDropdown(true);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      performSearch(value);
+    }, 300);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent | React.KeyboardEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setShowDropdown(false);
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -73,14 +143,57 @@ export default function Navbar() {
         </div>
 
         {/* Search Box */}
-        <div className="hidden lg:flex ml-auto items-center gap-2 bg-[var(--bg)] border border-[var(--border)] rounded-md px-2.5 py-1.5 w-[320px]">
-          <span className="text-[var(--text-faint)] text-[14px]">{"\u2315"}</span>
-          <input
-            type="text"
-            placeholder="paste a wallet, contract, or @handle"
-            className="flex-1 bg-transparent border-0 outline-none text-[var(--text-secondary)] text-[12px] placeholder:text-[var(--text-muted)]"
-          />
-          <span className="text-[var(--text-faint)] text-[10px]">{"\u2318"}K</span>
+        <div ref={searchRef} className="hidden lg:flex ml-auto relative w-[320px]">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 bg-[var(--bg)] border border-[var(--border)] rounded-md px-2.5 py-1.5 w-full">
+            <span className="text-[var(--text-faint)] text-[14px]">{"\u2315"}</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit(e)}
+              onFocus={() => searchQuery.length >= 2 && setShowDropdown(true)}
+              placeholder="paste a wallet, contract, or @handle"
+              className="flex-1 bg-transparent border-0 outline-none text-[var(--text-secondary)] text-[12px] placeholder:text-[var(--text-muted)]"
+            />
+            {isSearching ? (
+              <span className="text-[var(--text-faint)] text-[10px] animate-pulse">...</span>
+            ) : (
+              <span className="text-[var(--text-faint)] text-[10px]">{"\u21B5"}</span>
+            )}
+          </form>
+
+          {/* Search Dropdown */}
+          {showDropdown && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-md shadow-lg z-50 max-h-[300px] overflow-y-auto">
+              {searchResults.map((result) => (
+                <Link
+                  key={result.id}
+                  href={`/report/${result.id}`}
+                  onClick={() => setShowDropdown(false)}
+                  className="block px-3 py-2 hover:bg-[var(--border)] border-b border-[var(--border)] last:border-b-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${result.type === "twitter" ? "bg-[#1DA1F2]/20 text-[#1DA1F2]" : "bg-[var(--purple)]/20 text-[var(--purple)]"}`}>
+                      {result.type === "twitter" ? "@" : "0x"}
+                    </span>
+                    <span className="text-[var(--text)] text-[12px] font-medium truncate">
+                      {result.type === "twitter" ? `@${result.identifier}` : `${result.identifier.slice(0, 10)}...`}
+                    </span>
+                  </div>
+                  <div className="text-[var(--text-muted)] text-[11px] truncate mt-0.5">
+                    {result.reason.slice(0, 60)}...
+                  </div>
+                </Link>
+              ))}
+              <Link
+                href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                onClick={() => setShowDropdown(false)}
+                className="block px-3 py-2 text-center text-[var(--green)] text-[11px] hover:bg-[var(--border)]"
+              >
+                View all results for &quot;{searchQuery}&quot; {"\u2192"}
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* User Chip / Auth */}

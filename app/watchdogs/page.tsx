@@ -25,7 +25,8 @@ export default function WatchdogsPage() {
     fetch("/api/leaderboard?type=watchdogs&limit=50")
       .then((res) => res.json())
       .then((data) => {
-        setWatchdogs(data.watchdogs || []);
+        // API returns both topUsers and watchdogs for compatibility
+        setWatchdogs(data.watchdogs || data.topUsers || []);
         setLoading(false);
       })
       .catch(() => setLoading(false));

@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     interface WhereClause {
-      OR?: { identifier?: { contains: string; mode: "insensitive" }; reason?: { contains: string; mode: "insensitive" } }[];
+      OR?: {
+        identifier?: { contains: string; mode: "insensitive" };
+        reason?: { contains: string; mode: "insensitive" };
+        author?: { nickname: { contains: string; mode: "insensitive" } };
+      }[];
       subscammer?: { slug: string };
     }
     const where: WhereClause = {};
@@ -30,6 +34,7 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { identifier: { contains: search, mode: "insensitive" as const } },
         { reason: { contains: search, mode: "insensitive" as const } },
+        { author: { nickname: { contains: search, mode: "insensitive" as const } } },
       ];
     }
 

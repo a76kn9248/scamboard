@@ -27,7 +27,7 @@ export default function Top8Watchdogs({
   editable = false,
   size = "sm",
 }: Top8WatchdogsProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [watchdogs, setWatchdogs] = useState<Watchdog[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -42,15 +42,21 @@ export default function Top8Watchdogs({
 
   useEffect(() => {
     if (nickname) {
-      fetchTop8();
+      fetchTop8(`/api/users/${nickname}/top8`);
+    } else if (editable && session?.user?.name) {
+      // For editable mode without nickname, fetch current user's top 8
+      fetchTop8("/api/users/me/top8");
+    } else if (editable) {
+      // Wait for session to load
+      setLoading(status !== "loading");
     } else {
       setLoading(false);
     }
-  }, [nickname]);
+  }, [nickname, editable, session?.user?.name, status]);
 
-  const fetchTop8 = async () => {
+  const fetchTop8 = async (endpoint: string) => {
     try {
-      const res = await fetch(`/api/users/${nickname}/top8`);
+      const res = await fetch(endpoint);
       const data = await res.json();
       if (data.watchdogs) {
         setWatchdogs(data.watchdogs);

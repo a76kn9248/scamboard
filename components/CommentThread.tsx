@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
@@ -18,22 +18,88 @@ interface Comment {
   replies?: Comment[];
 }
 
+type SortOption = "hot" | "new" | "top" | "oldest";
+
 interface CommentThreadProps {
   reportId: string;
   comments?: Comment[];
   onCommentAdded?: (comment: Comment) => void;
 }
 
+// Calculate "hot" score with time decay
+function getHotScore(comment: Comment): number {
+  const ageInHours = (Date.now() - new Date(comment.createdAt).getTime()) / (1000 * 60 * 60);
+  // Simple decay formula: score / (age + 2)^1.5
+  return comment.score / Math.pow(ageInHours + 2, 1.5);
+}
+
+// Build comment tree from flat array
+function buildCommentTree(flatComments: Comment[]): Comment[] {
+  const commentMap = new Map<string, Comment>();
+  const rootComments: Comment[] = [];
+
+  // First pass: create map and initialize replies
+  flatComments.forEach((comment) => {
+    commentMap.set(comment.id, { ...comment, replies: [] });
+  });
+
+  // Second pass: build tree structure
+  flatComments.forEach((comment) => {
+    const commentWithReplies = commentMap.get(comment.id)!;
+    if (comment.parentId && commentMap.has(comment.parentId)) {
+      const parent = commentMap.get(comment.parentId)!;
+      parent.replies = parent.replies || [];
+      parent.replies.push(commentWithReplies);
+    } else {
+      rootComments.push(commentWithReplies);
+    }
+  });
+
+  // Sort replies chronologically (oldest first) within each thread
+  const sortRepliesChronologically = (comments: Comment[]): Comment[] => {
+    return comments.map((comment) => ({
+      ...comment,
+      replies: comment.replies
+        ? sortRepliesChronologically(
+            [...comment.replies].sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            )
+          )
+        : [],
+    }));
+  };
+
+  return sortRepliesChronologically(rootComments);
+}
+
+// Flatten tree to get all comments (for tree building from API response)
+function flattenCommentTree(comments: Comment[]): Comment[] {
+  const result: Comment[] = [];
+  const processComment = (comment: Comment) => {
+    result.push({
+      ...comment,
+      replies: undefined, // Remove replies for flat array
+    });
+    if (comment.replies) {
+      comment.replies.forEach(processComment);
+    }
+  };
+  comments.forEach(processComment);
+  return result;
+}
+
 function CommentItem({
   comment,
   reportId,
   depth = 0,
+  parentColor,
   onReply,
   onVote,
 }: {
   comment: Comment;
   reportId: string;
   depth?: number;
+  parentColor?: string;
   onReply: (parentId: string, newComment: Comment) => void;
   onVote: (commentId: string, score: number, userVote: number) => void;
 }) {
@@ -99,9 +165,13 @@ function CommentItem({
   const maxDepth = 3;
   const canReply = depth < maxDepth;
 
+  // Use parent's author color for the left border when nested
+  const borderColor = depth > 0 ? (parentColor || "var(--border)") : undefined;
+
   return (
     <div
-      className={depth > 0 ? "ml-4 pl-4 border-l-2 border-[var(--border)]" : ""}
+      className={depth > 0 ? "ml-4 pl-4 border-l-2" : ""}
+      style={depth > 0 ? { borderLeftColor: borderColor } : undefined}
     >
       <div className="bg-[var(--surface)] rounded-lg p-4 animate-fade-in">
         <div className="flex gap-3">
@@ -112,7 +182,7 @@ function CommentItem({
               className={`${comment.userVote === 1 ? "text-[var(--green)]" : "text-[var(--text-muted)]"} hover:text-[var(--green)] disabled:opacity-50`}
               disabled={!session}
             >
-              ▲
+              {"\u25B2"}
             </button>
             <span
               className={`font-bold ${comment.score > 0 ? "text-[var(--green)]" : comment.score < 0 ? "text-[var(--red)]" : "text-[var(--text-muted)]"}`}
@@ -124,7 +194,7 @@ function CommentItem({
               className={`${comment.userVote === -1 ? "text-[var(--red)]" : "text-[var(--text-muted)]"} hover:text-[var(--red)] disabled:opacity-50`}
               disabled={!session}
             >
-              ▼
+              {"\u25BC"}
             </button>
           </div>
 
@@ -209,6 +279,7 @@ function CommentItem({
               comment={reply}
               reportId={reportId}
               depth={depth + 1}
+              parentColor={comment.authorColor || "#7c5cff"}
               onReply={onReply}
               onVote={onVote}
             />
@@ -225,14 +296,19 @@ export default function CommentThread({
   onCommentAdded,
 }: CommentThreadProps) {
   const { data: session } = useSession();
-  const [comments, setComments] = useState<Comment[]>(initialComments || []);
+  const [rawComments, setRawComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!initialComments);
+  const [sortOption, setSortOption] = useState<SortOption>("hot");
 
   useEffect(() => {
-    if (!initialComments) {
+    if (initialComments) {
+      // Flatten and rebuild tree to ensure proper structure
+      const flat = flattenCommentTree(initialComments);
+      setRawComments(flat);
+    } else {
       fetchComments();
     }
   }, [reportId, initialComments]);
@@ -242,7 +318,9 @@ export default function CommentThread({
       const res = await fetch(`/api/reports/${reportId}/comments`);
       const data = await res.json();
       if (data.comments) {
-        setComments(data.comments);
+        // Flatten comments from API (in case they come nested)
+        const flat = flattenCommentTree(data.comments);
+        setRawComments(flat);
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
@@ -250,6 +328,29 @@ export default function CommentThread({
       setLoading(false);
     }
   };
+
+  // Build tree and apply sorting to top-level comments only
+  const sortedComments = useMemo(() => {
+    const tree = buildCommentTree(rawComments);
+
+    // Sort only top-level comments based on sortOption
+    const sortedTree = [...tree].sort((a, b) => {
+      switch (sortOption) {
+        case "hot":
+          return getHotScore(b) - getHotScore(a);
+        case "new":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "top":
+          return b.score - a.score;
+        case "oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return sortedTree;
+  }, [rawComments, sortOption]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -272,7 +373,8 @@ export default function CommentThread({
         return;
       }
 
-      setComments((prev) => [data.comment, ...prev]);
+      // Add to raw comments array
+      setRawComments((prev) => [data.comment, ...prev]);
       onCommentAdded?.(data.comment);
       setText("");
     } catch {
@@ -283,44 +385,16 @@ export default function CommentThread({
   };
 
   const handleReply = (parentId: string, newComment: Comment) => {
-    const addReplyToComment = (comments: Comment[]): Comment[] => {
-      return comments.map((c) => {
-        if (c.id === parentId) {
-          return {
-            ...c,
-            replies: [...(c.replies || []), newComment],
-          };
-        }
-        if (c.replies) {
-          return {
-            ...c,
-            replies: addReplyToComment(c.replies),
-          };
-        }
-        return c;
-      });
-    };
-
-    setComments(addReplyToComment(comments));
+    // Add new comment with parentId to raw comments
+    setRawComments((prev) => [...prev, { ...newComment, parentId }]);
   };
 
   const handleVote = (commentId: string, score: number, userVote: number) => {
-    const updateVoteInComments = (comments: Comment[]): Comment[] => {
-      return comments.map((c) => {
-        if (c.id === commentId) {
-          return { ...c, score, userVote };
-        }
-        if (c.replies) {
-          return {
-            ...c,
-            replies: updateVoteInComments(c.replies),
-          };
-        }
-        return c;
-      });
-    };
-
-    setComments(updateVoteInComments(comments));
+    setRawComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId ? { ...c, score, userVote } : c
+      )
+    );
   };
 
   const countTotalComments = (comments: Comment[]): number => {
@@ -329,11 +403,18 @@ export default function CommentThread({
     }, 0);
   };
 
+  const sortOptions: { value: SortOption; label: string }[] = [
+    { value: "hot", label: "Hot" },
+    { value: "new", label: "New" },
+    { value: "top", label: "Top" },
+    { value: "oldest", label: "Oldest" },
+  ];
+
   if (loading) {
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-          <span>&#x1F4AC;</span>
+          <span>{"\u{1F4AC}"}</span>
           Comments
         </h3>
         <div className="text-center text-[var(--text-muted)] py-4">
@@ -346,8 +427,8 @@ export default function CommentThread({
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-bold text-[var(--text)] flex items-center gap-2">
-        <span>&#x1F4AC;</span>
-        Comments ({countTotalComments(comments)})
+        <span>{"\u{1F4AC}"}</span>
+        Comments ({countTotalComments(sortedComments)})
       </h3>
 
       {/* Add comment form */}
@@ -388,14 +469,34 @@ export default function CommentThread({
         </p>
       )}
 
+      {/* Sort tabs */}
+      {rawComments.length > 0 && (
+        <div className="flex items-center gap-1 pt-2">
+          <span className="text-[var(--text-muted)] text-xs mr-2">Sort by:</span>
+          {sortOptions.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setSortOption(option.value)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                sortOption === option.value
+                  ? "bg-[var(--red)] text-white"
+                  : "bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--border)]"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Comment list */}
       <div className="space-y-3 pt-4 border-t border-[var(--border)]">
-        {comments.length === 0 ? (
+        {sortedComments.length === 0 ? (
           <p className="text-[var(--text-muted)] text-sm text-center py-4">
             No comments yet. Be the first to add intel.
           </p>
         ) : (
-          comments.map((comment) => (
+          sortedComments.map((comment) => (
             <CommentItem
               key={comment.id}
               comment={comment}

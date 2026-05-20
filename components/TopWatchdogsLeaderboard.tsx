@@ -16,22 +16,22 @@ interface TopWatchdogsLeaderboardProps {
   showFull?: boolean;
 }
 
-export default function TopWatchdogsLeaderboard({ limit = 5, showFull = false }: TopWatchdogsLeaderboardProps) {
+export default function TopWatchdogsLeaderboard({ limit = 5 }: TopWatchdogsLeaderboardProps) {
   const [watchdogs, setWatchdogs] = useState<Watchdog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch top users from leaderboard or users API
-    fetch("/api/leaderboard")
+    // Fetch top users from leaderboard API with type=watchdogs
+    fetch(`/api/leaderboard?type=watchdogs&limit=${limit}`)
       .then((res) => res.json())
       .then((data) => {
-        // Transform leaderboard data or use mock
-        const users = data.topUsers || defaultWatchdogs;
-        setWatchdogs(users.slice(0, limit));
+        // API returns topUsers array with color field
+        const users = data.topUsers || data.watchdogs || [];
+        setWatchdogs(users);
         setLoading(false);
       })
       .catch(() => {
-        setWatchdogs(defaultWatchdogs.slice(0, limit));
+        setWatchdogs([]);
         setLoading(false);
       });
   }, [limit]);
@@ -61,49 +61,47 @@ export default function TopWatchdogsLeaderboard({ limit = 5, showFull = false }:
         </span>
       </div>
       <div className="p-3">
-        {watchdogs.map((watchdog, index) => (
-          <Link
-            key={watchdog.nickname}
-            href={`/profile/${watchdog.nickname}`}
-            className="flex items-center gap-2.5 py-1.5 border-b border-dashed border-[var(--border)] last:border-b-0 hover:bg-[rgba(255,255,255,0.02)] transition-colors"
-          >
-            <span className="font-display font-black text-[var(--text-muted)] w-3.5 text-center">
-              {index + 1}
-            </span>
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center font-display font-black text-[12px] text-white"
-              style={{ background: watchdog.color }}
+        {watchdogs.length === 0 ? (
+          <div className="text-center text-[var(--text-muted)] text-xs py-4">
+            No watchdogs yet. Start reporting!
+          </div>
+        ) : (
+          watchdogs.map((watchdog, index) => (
+            <Link
+              key={watchdog.nickname}
+              href={`/profile/${watchdog.nickname}`}
+              className="flex items-center gap-2.5 py-1.5 border-b border-dashed border-[var(--border)] last:border-b-0 hover:bg-[rgba(255,255,255,0.02)] transition-colors"
             >
-              {watchdog.nickname[0].toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
+              <span className="font-display font-black text-[var(--text-muted)] w-3.5 text-center">
+                {index + 1}
+              </span>
               <div
-                className="font-bold text-[12px] truncate"
-                style={{ color: watchdog.color }}
+                className="w-7 h-7 rounded-full flex items-center justify-center font-display font-black text-[12px] text-white"
+                style={{ background: watchdog.color }}
               >
-                @{watchdog.nickname}
+                {watchdog.nickname[0].toUpperCase()}
               </div>
-              <div className="text-[10px] text-[var(--text-muted)]">
-                {watchdog.title}
-                {watchdog.mood && (
-                  <span className="italic"> {"\u00B7"} mood: {watchdog.mood}</span>
-                )}
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-bold text-[12px] truncate"
+                  style={{ color: watchdog.color }}
+                >
+                  @{watchdog.nickname}
+                </div>
+                <div className="text-[10px] text-[var(--text-muted)]">
+                  {watchdog.title}
+                  {watchdog.mood && (
+                    <span className="italic"> {"\u00B7"} mood: {watchdog.mood}</span>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="font-display font-black text-[12px] text-[var(--gold)]">
-              {watchdog.xp.toLocaleString()}
-            </div>
-          </Link>
-        ))}
+              <div className="font-display font-black text-[12px] text-[var(--gold)]">
+                {watchdog.xp.toLocaleString()}
+              </div>
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );
 }
-
-const defaultWatchdogs: Watchdog[] = [
-  { nickname: "rugslayer.eth", color: "#ff3b9a", title: "Bounty Hunter", xp: 4820, mood: "vengeful" },
-  { nickname: "etherdetective", color: "#7c5cff", title: "Watchdog", xp: 3960, mood: "caffeinated" },
-  { nickname: "soliditysnitch", color: "#34d399", title: "Code Auditor", xp: 3110, mood: "smug" },
-  { nickname: "0xforensics", color: "#22d3ee", title: "Bounty Hunter", xp: 2740, mood: "patient" },
-  { nickname: "botbusterella", color: "#f472b6", title: "Watchdog", xp: 2180, mood: "tired" },
-];
