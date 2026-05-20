@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 
@@ -34,6 +34,7 @@ export default function Top8Watchdogs({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Watchdog[]>([]);
   const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayTitle = ownerNickname ? `${ownerNickname}'s Top 8 Watchdogs` : title;
   const avatarSize = size === "sm" ? "w-[44px] h-[44px]" : "w-[64px] h-[64px]";
@@ -68,38 +69,53 @@ export default function Top8Watchdogs({
     }
   };
 
-  const handleSearch = async (query: string) => {
+  // Perform the actual search
+  const performSearch = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&limit=10`);
+      if (res.ok) {
+        const data = await res.json();
+        // Filter out users already in watchdogs and current user
+        const filteredUsers = (data.users || []).filter(
+          (user: Watchdog) =>
+            !watchdogs.find((w) => w.id === user.id) &&
+            user.id !== session?.user?.id
+        );
+        setSearchResults(filteredUsers);
+      } else {
+        setSearchResults([]);
+      }
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [watchdogs, session?.user?.id]);
+
+  // Debounced search handler
+  const handleSearch = (query: string) => {
     setSearchQuery(query);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
 
     setSearching(true);
-    try {
-      // Simple search - in production you'd have a proper search endpoint
-      const res = await fetch(`/api/users/${query}`);
-      if (res.ok) {
-        const user = await res.json();
-        if (user.user && !watchdogs.find((w) => w.id === user.user.id)) {
-          setSearchResults([
-            {
-              id: user.user.id,
-              nickname: user.user.nickname,
-              profileColor: user.user.profileColor,
-              title: user.user.title,
-              mood: user.user.mood,
-            },
-          ]);
-        }
-      } else {
-        setSearchResults([]);
-      }
-    } catch (err) {
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
-    }
+    debounceRef.current = setTimeout(() => {
+      performSearch(query);
+    }, 300);
   };
 
   const addWatchdog = async (watchdog: Watchdog) => {

@@ -38,47 +38,20 @@ export async function GET(
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
 
-    // Get all comments for this report (only top-level)
+    // Get ALL comments for this report (flat list, client will build tree)
     const comments = await prisma.comment.findMany({
-      where: { reportId, parentId: null },
+      where: { reportId },
       include: {
         user: {
           select: { id: true, nickname: true, profileColor: true },
         },
         votes: true,
-        replies: {
-          include: {
-            user: {
-              select: { id: true, nickname: true, profileColor: true },
-            },
-            votes: true,
-            replies: {
-              include: {
-                user: {
-                  select: { id: true, nickname: true, profileColor: true },
-                },
-                votes: true,
-                replies: {
-                  include: {
-                    user: {
-                      select: { id: true, nickname: true, profileColor: true },
-                    },
-                    votes: true,
-                  },
-                  orderBy: { createdAt: "asc" },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-            },
-          },
-          orderBy: { createdAt: "asc" },
-        },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
 
-    // Transform comments to include score and userVote
-    const transformComment = (comment: typeof comments[0]): object => {
+    // Transform to flat array with parentId preserved
+    const flatComments = comments.map((comment) => {
       const score = comment.votes.reduce((acc, v) => acc + v.value, 0);
       const userVote = userId
         ? comment.votes.find((v) => v.userId === userId)?.value ?? 0
@@ -90,18 +63,15 @@ export async function GET(
         authorId: comment.user.id,
         authorNickname: comment.user.nickname,
         authorColor: comment.user.profileColor,
-        parentId: comment.parentId,
+        parentId: comment.parentId, // This is the key - preserve parentId for ALL comments
         score,
         userVote,
         createdAt: comment.createdAt,
-        replies: "replies" in comment && comment.replies
-          ? comment.replies.map((r: typeof comments[0]) => transformComment(r))
-          : [],
       };
-    };
+    });
 
     return NextResponse.json({
-      comments: comments.map(transformComment),
+      comments: flatComments,
     });
   } catch (error) {
     console.error("Error fetching comments:", error);

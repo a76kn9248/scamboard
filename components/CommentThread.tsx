@@ -72,21 +72,6 @@ function buildCommentTree(flatComments: Comment[]): Comment[] {
   return sortRepliesChronologically(rootComments);
 }
 
-// Flatten tree to get all comments (for tree building from API response)
-function flattenCommentTree(comments: Comment[]): Comment[] {
-  const result: Comment[] = [];
-  const processComment = (comment: Comment) => {
-    result.push({
-      ...comment,
-      replies: undefined, // Remove replies for flat array
-    });
-    if (comment.replies) {
-      comment.replies.forEach(processComment);
-    }
-  };
-  comments.forEach(processComment);
-  return result;
-}
 
 function CommentItem({
   comment,
@@ -305,9 +290,9 @@ export default function CommentThread({
 
   useEffect(() => {
     if (initialComments) {
-      // Flatten and rebuild tree to ensure proper structure
-      const flat = flattenCommentTree(initialComments);
-      setRawComments(flat);
+      // Initial comments might be pre-fetched, use directly
+      setRawComments(initialComments);
+      setLoading(false);
     } else {
       fetchComments();
     }
@@ -318,9 +303,8 @@ export default function CommentThread({
       const res = await fetch(`/api/reports/${reportId}/comments`);
       const data = await res.json();
       if (data.comments) {
-        // Flatten comments from API (in case they come nested)
-        const flat = flattenCommentTree(data.comments);
-        setRawComments(flat);
+        // API now returns flat array with parentId preserved
+        setRawComments(data.comments);
       }
     } catch (err) {
       console.error("Error fetching comments:", err);
