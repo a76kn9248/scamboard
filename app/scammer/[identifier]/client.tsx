@@ -11,7 +11,6 @@ import BountyPool from "@/components/BountyPool";
 import RapSheet from "@/components/RapSheet";
 import Timeline from "@/components/Timeline";
 import CommentThread from "@/components/CommentThread";
-import TurnstileWidget from "@/components/TurnstileWidget";
 import { getThreatLevel } from "@/lib/threat-levels";
 
 interface Report {
@@ -57,7 +56,6 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
   const [loading, setLoading] = useState(true);
   const [commentSort, setCommentSort] = useState("top");
   const [watching, setWatching] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -143,7 +141,7 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
   }, [identifier, session]);
 
   const handleWatch = async () => {
-    if (!turnstileToken || !session) return;
+    if (!session) return;
     setActionLoading("watch");
 
     try {
@@ -153,7 +151,6 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
         body: JSON.stringify({
           targetType: "scammer",
           targetId: identifier,
-          turnstileToken,
         }),
       });
 
@@ -169,7 +166,7 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
   };
 
   const handleVictimConfirm = async () => {
-    if (!turnstileToken || !session || !scammer) return;
+    if (!session || !scammer) return;
     setActionLoading("victim");
 
     try {
@@ -178,7 +175,6 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           isVictim: true,
-          turnstileToken,
         }),
       });
 
@@ -350,17 +346,11 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
               {scammer.totalConfirms} confirms {"\u00B7"} {scammer.victimCount} victims {"\u00B7"} {scammer.reportCount} reports
             </div>
 
-            {session && (
-              <div className="mt-3">
-                <TurnstileWidget onVerify={setTurnstileToken} />
-              </div>
-            )}
-
             <div className="flex gap-2 mt-[18px] justify-end flex-wrap">
               {session && (
                 <button
                   onClick={handleWatch}
-                  disabled={actionLoading === "watch" || !turnstileToken}
+                  disabled={actionLoading === "watch"}
                   className={`btn-secondary text-[12px] py-2 px-3.5 disabled:opacity-50 ${watching ? "border-[var(--red)] text-[var(--red)]" : ""}`}
                 >
                   {"\u{1F441}"} {watching ? "Watching" : "Watch"}
@@ -375,7 +365,7 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
               {session && (
                 <button
                   onClick={handleVictimConfirm}
-                  disabled={actionLoading === "victim" || !turnstileToken}
+                  disabled={actionLoading === "victim"}
                   className="btn-primary text-[12px] py-2 px-3.5 disabled:opacity-50"
                 >
                   {actionLoading === "victim" ? "..." : "\u2713"} I was rugged too

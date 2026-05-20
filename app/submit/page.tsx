@@ -16,11 +16,22 @@ export default function SubmitPage() {
   const [type, setType] = useState<"deployer" | "twitter">("deployer");
   const [identifier, setIdentifier] = useState("");
   const [chain, setChain] = useState("ETH");
+  const [category, setCategory] = useState("rugpulls");
   const [reason, setReason] = useState("");
   const [evidence, setEvidence] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const CATEGORIES = [
+    { value: "rugpulls", label: "Rug Pulls" },
+    { value: "honeypots", label: "Honeypots" },
+    { value: "twitterscams", label: "Twitter Scams" },
+    { value: "alphafrauds", label: "Alpha Frauds" },
+    { value: "bridgehacks", label: "Bridge Hacks" },
+    { value: "discord_scams", label: "Discord Scams" },
+    { value: "under_investigation", label: "Under Investigation" },
+  ];
 
   const CHAINS = [
     { value: "ETH", label: "Ethereum" },
@@ -87,6 +98,7 @@ export default function SubmitPage() {
           type,
           identifier: identifier.trim(),
           chain,
+          category,
           reason: reason.trim(),
           evidence: evidence.trim() || null,
           turnstileToken,
@@ -200,6 +212,24 @@ export default function SubmitPage() {
                   </select>
                 </div>
               )}
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                  Category
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="input"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      r/{c.value} - {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Reason */}
               <div>

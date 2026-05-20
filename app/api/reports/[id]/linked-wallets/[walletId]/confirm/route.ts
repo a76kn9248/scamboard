@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { verifyTurnstile } from "@/lib/turnstile";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { awardXP, XP_REWARDS } from "@/lib/xp";
 
 export const dynamic = "force-dynamic";
@@ -19,22 +19,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { turnstileToken } = body;
-
-    // Verify Turnstile
-    if (!turnstileToken) {
+    // Check rate limit (1 per 2 seconds)
+    const rateLimitResult = checkRateLimit(session.user.id, "confirm-wallet", 2000);
+    if (!rateLimitResult.allowed) {
       return NextResponse.json(
-        { error: "Bot verification required" },
-        { status: 400 }
-      );
-    }
-
-    const turnstileValid = await verifyTurnstile(turnstileToken);
-    if (!turnstileValid) {
-      return NextResponse.json(
-        { error: "Bot verification failed" },
-        { status: 400 }
+        { error: `Rate limited. Try again in ${rateLimitResult.retryAfter} seconds.` },
+        { status: 429 }
       );
     }
 

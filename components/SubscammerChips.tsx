@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 interface Subscammer {
@@ -27,6 +28,7 @@ export default function SubscammerChips({ subscammers = defaultSubscammers }: Su
   const searchParams = useSearchParams();
   const router = useRouter();
   const currentSub = searchParams.get("sub") || "all";
+  const [showSuggestMessage, setShowSuggestMessage] = useState(false);
 
   const handleChipClick = (slug: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -69,7 +71,30 @@ export default function SubscammerChips({ subscammers = defaultSubscammers }: Su
         );
       })}
 
-      <button className="chip flex-shrink-0 text-[var(--text-faint)]">+ new</button>
+      <div className="relative">
+        <button
+          onClick={() => setShowSuggestMessage(!showSuggestMessage)}
+          className="chip flex-shrink-0 text-[var(--text-faint)] hover:text-[var(--text-muted)]"
+        >
+          + suggest
+        </button>
+        {showSuggestMessage && (
+          <div className="absolute top-full right-0 mt-2 p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg z-50 w-64 text-xs text-[var(--text-muted)]">
+            <p className="mb-2">
+              <strong className="text-[var(--text)]">Want a new category?</strong>
+            </p>
+            <p>
+              Suggest it in the comments of any report. If enough people agree, we&apos;ll add it!
+            </p>
+            <button
+              onClick={() => setShowSuggestMessage(false)}
+              className="mt-2 text-[var(--red)] hover:underline"
+            >
+              Got it
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

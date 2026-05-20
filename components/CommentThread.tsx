@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
-import TurnstileWidget from "./TurnstileWidget";
 
 interface Comment {
   id: string;
@@ -41,13 +40,12 @@ function CommentItem({
   const { data: session } = useSession();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || !turnstileToken || isSubmitting) return;
+    if (!replyText.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     setError("");
@@ -59,7 +57,6 @@ function CommentItem({
         body: JSON.stringify({
           text: replyText.trim(),
           parentId: comment.id,
-          turnstileToken,
         }),
       });
 
@@ -73,7 +70,6 @@ function CommentItem({
       onReply(comment.id, data.comment);
       setReplyText("");
       setShowReplyForm(false);
-      setTurnstileToken("");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -82,13 +78,13 @@ function CommentItem({
   };
 
   const handleVote = async (value: number) => {
-    if (!turnstileToken) return;
+    if (!session) return;
 
     try {
       const res = await fetch(`/api/comments/${comment.id}/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value, turnstileToken }),
+        body: JSON.stringify({ value }),
       });
 
       if (res.ok) {
@@ -179,17 +175,13 @@ function CommentItem({
                   rows={2}
                   className="input resize-none text-sm"
                 />
-                <TurnstileWidget
-                  onVerify={setTurnstileToken}
-                  onExpire={() => setTurnstileToken("")}
-                />
                 {error && (
                   <p className="text-[var(--red)] text-xs">{error}</p>
                 )}
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    disabled={!replyText.trim() || !turnstileToken || isSubmitting}
+                    disabled={!replyText.trim() || isSubmitting}
                     className="btn-secondary text-xs py-1 px-3 disabled:opacity-50"
                   >
                     {isSubmitting ? "Posting..." : "Reply"}
@@ -235,7 +227,6 @@ export default function CommentThread({
   const { data: session } = useSession();
   const [comments, setComments] = useState<Comment[]>(initialComments || []);
   const [text, setText] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!initialComments);
@@ -262,7 +253,7 @@ export default function CommentThread({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || !turnstileToken || isSubmitting) return;
+    if (!text.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     setError("");
@@ -271,7 +262,7 @@ export default function CommentThread({
       const res = await fetch(`/api/reports/${reportId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), turnstileToken }),
+        body: JSON.stringify({ text: text.trim() }),
       });
 
       const data = await res.json();
@@ -284,7 +275,6 @@ export default function CommentThread({
       setComments((prev) => [data.comment, ...prev]);
       onCommentAdded?.(data.comment);
       setText("");
-      setTurnstileToken("");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -377,18 +367,13 @@ export default function CommentThread({
             </span>
           </div>
 
-          <TurnstileWidget
-            onVerify={setTurnstileToken}
-            onExpire={() => setTurnstileToken("")}
-          />
-
           {error && (
             <p className="text-[var(--red)] text-sm">{error}</p>
           )}
 
           <button
             type="submit"
-            disabled={!text.trim() || !turnstileToken || isSubmitting}
+            disabled={!text.trim() || isSubmitting}
             className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Posting..." : "Post Comment"}

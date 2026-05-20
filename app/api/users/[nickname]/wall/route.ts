@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { verifyTurnstile } from "@/lib/turnstile";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +82,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { content, turnstileToken } = body;
+    const { content } = body;
 
     // Validate content
     if (!content || typeof content !== "string") {
@@ -98,17 +97,6 @@ export async function POST(
         { error: "Wall posts must be 280 characters or less" },
         { status: 400 }
       );
-    }
-
-    // Verify Turnstile
-    if (turnstileToken) {
-      const turnstileValid = await verifyTurnstile(turnstileToken);
-      if (!turnstileValid) {
-        return NextResponse.json(
-          { error: "Bot verification failed" },
-          { status: 400 }
-        );
-      }
     }
 
     // Rate limit check (15 seconds)

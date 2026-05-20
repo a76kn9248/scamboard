@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
 import CommentThread from "@/components/CommentThread";
-import TurnstileWidget from "@/components/TurnstileWidget";
 import ThreatBadge from "@/components/ThreatBadge";
 import ScammerAvatar from "@/components/ScammerAvatar";
 import RoastSection from "@/components/RoastSection";
@@ -59,7 +58,6 @@ export default function ReportPage({
   const [bountyData, setBountyData] = useState<BountyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
@@ -96,7 +94,7 @@ export default function ReportPage({
   }, [id]);
 
   const handleConfirm = async () => {
-    if (!session || !turnstileToken || isConfirming) return;
+    if (!session || isConfirming) return;
 
     setIsConfirming(true);
     setConfirmError("");
@@ -105,7 +103,7 @@ export default function ReportPage({
       const res = await fetch(`/api/reports/${id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ turnstileToken }),
+        body: JSON.stringify({}),
       });
 
       const data = await res.json();
@@ -124,7 +122,6 @@ export default function ReportPage({
             }
           : null
       );
-      setTurnstileToken("");
     } catch {
       setConfirmError("Network error. Please try again.");
     } finally {
@@ -288,31 +285,26 @@ export default function ReportPage({
 
           {session ? (
             <>
-              <TurnstileWidget
-                onVerify={setTurnstileToken}
-                onExpire={() => setTurnstileToken("")}
-              />
-
               {confirmError && (
                 <p className="text-[var(--red-primary)] text-sm mb-3">{confirmError}</p>
               )}
 
               <button
                 onClick={handleConfirm}
-                disabled={!turnstileToken || isConfirming}
+                disabled={isConfirming}
                 className={`w-full py-3 rounded font-medium transition-all ${
                   report.userHasConfirmed
                     ? "bg-[var(--background-tertiary)] text-[var(--foreground-muted)] hover:bg-[var(--background-card)]"
                     : "btn-primary"
                 } disabled:opacity-50 disabled:cursor-not-allowed ${
-                  !report.userHasConfirmed && turnstileToken ? "animate-pulse-red" : ""
+                  !report.userHasConfirmed ? "animate-pulse-red" : ""
                 }`}
               >
                 {isConfirming
                   ? "Processing..."
                   : report.userHasConfirmed
                   ? "Remove Confirm"
-                  : "&#x1F525; CONFIRM SCAMMER"}
+                  : "🔥 CONFIRM SCAMMER"}
               </button>
             </>
           ) : (

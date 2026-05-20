@@ -14,18 +14,29 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const sort = searchParams.get("sort") || "confirms";
     const search = searchParams.get("search") || "";
+    const sub = searchParams.get("sub") || "";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
     const skip = (page - 1) * limit;
 
-    const where = search
-      ? {
-          OR: [
-            { identifier: { contains: search, mode: "insensitive" as const } },
-            { reason: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : {};
+    // Build where clause
+    interface WhereClause {
+      OR?: { identifier?: { contains: string; mode: "insensitive" }; reason?: { contains: string; mode: "insensitive" } }[];
+      subscammer?: { slug: string };
+    }
+    const where: WhereClause = {};
+
+    if (search) {
+      where.OR = [
+        { identifier: { contains: search, mode: "insensitive" as const } },
+        { reason: { contains: search, mode: "insensitive" as const } },
+      ];
+    }
+
+    // Filter by subscammer category
+    if (sub && sub !== "all") {
+      where.subscammer = { slug: sub };
+    }
 
     // Determine order by based on sort option
     type OrderByType = { confirms?: { _count: "desc" | "asc" }; createdAt?: "desc" | "asc"; roasts?: { _count: "desc" | "asc" }; bounties?: { _count: "desc" | "asc" }; disputeCount?: "desc" | "asc" };
@@ -118,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { type, identifier, reason, evidence, turnstileToken } = body;
+    const { type, identifier, reason, evidence, category, turnstileToken } = body;
 
     // Verify Turnstile
     if (!turnstileToken) {
@@ -187,6 +198,17 @@ export async function POST(request: NextRequest) {
         ? sanitizedIdentifier.slice(1)
         : sanitizedIdentifier;
 
+    // Find or create subscammer category
+    let subscammerId: string | undefined;
+    if (category) {
+      const subscammer = await prisma.subscammer.findUnique({
+        where: { slug: category },
+      });
+      if (subscammer) {
+        subscammerId = subscammer.id;
+      }
+    }
+
     const report = await prisma.report.create({
       data: {
         type,
@@ -194,6 +216,7 @@ export async function POST(request: NextRequest) {
         reason: sanitizedReason,
         evidence: sanitizedEvidence,
         authorId: session.user.id,
+        subscammerId,
       },
       include: {
         author: {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { verifyTurnstile } from "@/lib/turnstile";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeInput } from "@/lib/validation";
 import { awardXP, XP_REWARDS } from "@/lib/xp";
@@ -88,23 +87,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { text, turnstileToken } = body;
-
-    // Verify Turnstile
-    if (!turnstileToken) {
-      return NextResponse.json(
-        { error: "Bot verification required" },
-        { status: 400 }
-      );
-    }
-
-    const turnstileValid = await verifyTurnstile(turnstileToken);
-    if (!turnstileValid) {
-      return NextResponse.json(
-        { error: "Bot verification failed" },
-        { status: 400 }
-      );
-    }
+    const { text } = body;
 
     // Check rate limit (1 per 60 seconds)
     const rateLimitResult = checkRateLimit(session.user.id, "roast", 60000);
