@@ -3,15 +3,17 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { formatDistanceToNow } from "@/lib/utils";
 import MoodWidget from "@/components/MoodWidget";
 import ThemeSongPlayer from "@/components/ThemeSongPlayer";
 import AchievementStickers from "@/components/AchievementStickers";
 import Top8Watchdogs from "@/components/Top8Watchdogs";
 import Wall from "@/components/Wall";
 import ProfileCustomizer from "@/components/ProfileCustomizer";
+import UserReportsList from "@/components/UserReportsList";
+import UserRoastsList from "@/components/UserRoastsList";
 
 interface UserProfile {
+  id?: string;
   nickname: string;
   bio: string | null;
   profileColor: string | null;
@@ -35,6 +37,11 @@ interface UserProfile {
     roasts: number;
     roastWins: number;
   };
+  weeklyStats?: {
+    reports: number;
+    confirms: number;
+    roastWins: number;
+  };
 }
 
 export default function UserProfileClient({ nickname }: { nickname: string }) {
@@ -42,6 +49,10 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("about");
+  const [watching, setWatching] = useState(false);
+  const [watchLoading, setWatchLoading] = useState(false);
+  const [showMessageTooltip, setShowMessageTooltip] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const isOwnProfile = session?.user?.name === nickname;
 
@@ -58,6 +69,50 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
       })
       .catch(() => setLoading(false));
   }, [nickname]);
+
+  const handleWatch = async () => {
+    if (!session || !profile?.id || isOwnProfile) return;
+    setWatchLoading(true);
+
+    try {
+      const res = await fetch("/api/watch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetType: "user",
+          targetId: profile.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setWatching(data.watching);
+      }
+    } catch (err) {
+      console.error("Error toggling watch:", err);
+    } finally {
+      setWatchLoading(false);
+    }
+  };
+
+  const handleColorChange = async (color: string) => {
+    if (!session || !isOwnProfile) return;
+
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileColor: color }),
+      });
+
+      if (res.ok) {
+        setProfile((prev) => prev ? { ...prev, profileColor: color } : null);
+        setShowColorPicker(false);
+      }
+    } catch (err) {
+      console.error("Error updating color:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -92,7 +147,6 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
   }
 
   const color = profile.profileColor || "#ff3b9a";
-  const xpProgress = profile.nextTitleProgress?.progress || Math.min((profile.xp / 5000) * 100, 100);
 
   const tabs = [
     { id: "about", label: "\u{1F4CB} About" },
@@ -118,12 +172,43 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
         <span className="text-[var(--text-faint)]">/</span>
         <span className="text-[var(--text)]">@{nickname}</span>
         <span className="ml-auto text-[var(--text-muted)]">
-          this profile is themed by its owner {"\u00B7"}{" "}
-          <span style={{ color }} className="cursor-pointer hover:underline">
-            change skin
-          </span>
+          this profile is themed by its owner ·{" "}
+          {isOwnProfile ? (
+            <span
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              style={{ color }}
+              className="cursor-pointer hover:underline"
+            >
+              change skin
+            </span>
+          ) : (
+            <span style={{ color }}>view only</span>
+          )}
         </span>
       </div>
+
+      {/* Color Picker Dropdown */}
+      {showColorPicker && isOwnProfile && (
+        <div className="absolute right-[22px] top-[50px] z-50 bg-[var(--surface)] border border-[var(--border)] rounded-lg p-3 shadow-lg">
+          <div className="text-xs text-[var(--text-muted)] mb-2">Pick a color:</div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {["#ff3b6c", "#ff3b9a", "#ff7a3a", "#ffc547", "#6ce28a", "#5cd0e2", "#b58aff", "#7c5cff", "#34d399", "#22d3ee", "#f472b6", "#fb923c", "#facc15", "#60a5fa"].map((c) => (
+              <button
+                key={c}
+                onClick={() => handleColorChange(c)}
+                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${profile?.profileColor === c ? "ring-2 ring-white" : ""}`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <button
+            onClick={() => setShowColorPicker(false)}
+            className="mt-2 text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+          >
+            close
+          </button>
+        </div>
+      )}
 
       {/* Banner */}
       <div
@@ -211,21 +296,35 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
 
           {/* Action buttons */}
           <div className="flex gap-1.5 px-3.5 pb-3.5">
-            <button
-              className="flex-1 py-[7px] px-2 text-[11px] font-bold rounded-md"
-              style={{
-                background: `linear-gradient(180deg, ${color}, ${color}cc)`,
-                border: `1px solid ${color}`,
-                color: "#fff",
-              }}
-            >
-              + watch
-            </button>
-            <button className="flex-1 py-[7px] px-2 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] text-[11px] font-bold rounded-md">
-              message
-            </button>
+            {!isOwnProfile && session && (
+              <button
+                onClick={handleWatch}
+                disabled={watchLoading}
+                className="flex-1 py-[7px] px-2 text-[11px] font-bold rounded-md disabled:opacity-50"
+                style={{
+                  background: watching ? "transparent" : `linear-gradient(180deg, ${color}, ${color}cc)`,
+                  border: `1px solid ${color}`,
+                  color: watching ? color : "#fff",
+                }}
+              >
+                {watchLoading ? "..." : watching ? "✓ watching" : "+ watch"}
+              </button>
+            )}
+            <div className="flex-1 relative">
+              <button
+                onClick={() => setShowMessageTooltip(!showMessageTooltip)}
+                className="w-full py-[7px] px-2 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] text-[11px] font-bold rounded-md"
+              >
+                message
+              </button>
+              {showMessageTooltip && (
+                <div className="absolute top-full left-0 mt-1 p-2 bg-[var(--surface)] border border-[var(--border)] rounded text-[10px] text-[var(--text-muted)] whitespace-nowrap z-10">
+                  Coming soon! 🚀
+                </div>
+              )}
+            </div>
             <button className="w-10 py-[7px] bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] text-[11px] font-bold rounded-md">
-              {"\u2605"}
+              ★
             </button>
           </div>
 
@@ -234,10 +333,11 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
             mood={profile.mood || "vibing"}
             currentlyDoing={profile.currentlyDoing}
             specialty={profile.specialty}
-            chainMain="SOL \u00B7 ETH"
+            chainMain="SOL · ETH"
             memberSince={memberSinceText}
             userColor={color}
             editable={isOwnProfile}
+            onEdit={() => setActiveTab("customize")}
           />
 
           {/* Theme song */}
@@ -246,6 +346,7 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
             songLabel={profile.themeSongLabel}
             userColor={color}
             editable={isOwnProfile}
+            onEdit={() => setActiveTab("customize")}
           />
 
           {/* Achievement stickers */}
@@ -317,10 +418,10 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
               {/* Stat cards */}
               <div className="grid grid-cols-4 gap-2.5">
                 {[
-                  { value: profile.stats.reports, label: "reports", color: "var(--red)", delta: "+3 this week" },
-                  { value: profile.stats.confirms, label: "confirms", color: "var(--gold)", delta: "+88 this week" },
-                  { value: profile.stats.roastWins, label: "roasts won", color: "var(--green)", delta: "+1 this week" },
-                  { value: "98%", label: "confirm rate", color: "var(--cyan)", delta: "top 1%" },
+                  { value: profile.stats.reports, label: "reports", color: "var(--red)" },
+                  { value: profile.stats.confirms, label: "confirms", color: "var(--gold)" },
+                  { value: profile.stats.roastWins, label: "roasts won", color: "var(--green)" },
+                  { value: profile.stats.comments, label: "comments", color: "var(--cyan)" },
                 ].map((stat, i) => (
                   <div
                     key={i}
@@ -330,13 +431,10 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
                       className="font-display font-black text-[28px] tracking-[-1px] leading-none"
                       style={{ color: stat.color }}
                     >
-                      {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
+                      {stat.value.toLocaleString()}
                     </div>
                     <div className="text-[var(--text-muted)] text-[10px] uppercase tracking-wider mt-1.5">
                       {stat.label}
-                    </div>
-                    <div className="text-[var(--green)] text-[10px] mt-1">
-                      {stat.delta}
                     </div>
                   </div>
                 ))}
@@ -346,24 +444,34 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
               <div className="bg-[linear-gradient(180deg,#1a1413,#161110)] border border-[var(--border)] rounded-[10px] p-4">
                 <div className="flex justify-between items-baseline text-[12px]">
                   <span style={{ color }} className="font-bold">
-                    {"\u26CF"} {profile.title || "Fresh Degen"} {"\u00B7"} {profile.xp.toLocaleString()} XP
+                    ⛏ {profile.title || "Fresh Degen"} · {profile.xp.toLocaleString()} XP
                   </span>
-                  <span className="text-[var(--text-muted)]">
-                    {"\u2192"} {profile.nextTitleProgress?.nextTitle || "Sentinel"} ({profile.nextTitleProgress?.xpNeeded || 5000} XP)
-                  </span>
+                  {profile.nextTitleProgress ? (
+                    <span className="text-[var(--text-muted)]">
+                      → {profile.nextTitleProgress.nextTitle}
+                    </span>
+                  ) : (
+                    <span className="text-[var(--gold)]">MAX LEVEL ★</span>
+                  )}
                 </div>
                 <div className="h-[10px] bg-[var(--bg)] rounded-full mt-2 overflow-hidden border border-[var(--border)]">
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${xpProgress}%`,
-                      background: `linear-gradient(90deg, ${color}, var(--gold))`,
+                      width: `${profile.nextTitleProgress ? profile.nextTitleProgress.progress : 100}%`,
+                      background: profile.nextTitleProgress
+                        ? `linear-gradient(90deg, ${color}, var(--gold))`
+                        : "linear-gradient(90deg, var(--gold), #fff176)",
                     }}
                   />
                 </div>
                 <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-muted)]">
-                  <span>{profile.nextTitleProgress?.xpNeeded ? profile.nextTitleProgress.xpNeeded - profile.xp : 180} XP to next tier</span>
-                  <span>+62 today</span>
+                  {profile.nextTitleProgress ? (
+                    <span>{profile.nextTitleProgress.xpNeeded} XP to next tier</span>
+                  ) : (
+                    <span>You&apos;ve reached the top!</span>
+                  )}
+                  <span>Member since {memberSinceText}</span>
                 </div>
               </div>
 
@@ -382,48 +490,77 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
           )}
 
           {activeTab === "stats" && (
-            <div className="card p-6">
-              <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
-                Detailed Statistics
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: "Total Reports", value: profile.stats.reports, color: "var(--red)" },
-                  { label: "Total Confirms", value: profile.stats.confirms, color: "var(--gold)" },
-                  { label: "Comments", value: profile.stats.comments, color: "var(--cyan)" },
-                  { label: "Roasts Submitted", value: profile.stats.roasts, color: "var(--purple)" },
-                  { label: "Roast Wins", value: profile.stats.roastWins, color: "var(--green)" },
-                  { label: "Total XP", value: profile.xp, color: "var(--gold)" },
-                ].map((stat, i) => (
-                  <div key={i} className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-4 text-center">
-                    <div className="font-display font-black text-[32px]" style={{ color: stat.color }}>
-                      {stat.value.toLocaleString()}
+            <div className="space-y-4">
+              <div className="card p-6">
+                <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
+                  📊 Detailed Statistics
+                </h2>
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: "Total Reports", value: profile.stats.reports, color: "var(--red)" },
+                    { label: "Total Confirms", value: profile.stats.confirms, color: "var(--gold)" },
+                    { label: "Comments", value: profile.stats.comments, color: "var(--cyan)" },
+                    { label: "Roasts Submitted", value: profile.stats.roasts, color: "var(--purple)" },
+                    { label: "Roast Wins", value: profile.stats.roastWins, color: "var(--green)" },
+                    { label: "Total XP", value: profile.xp, color: "var(--gold)" },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-4 text-center">
+                      <div className="font-display font-black text-[32px]" style={{ color: stat.color }}>
+                        {stat.value.toLocaleString()}
+                      </div>
+                      <div className="text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
+                        {stat.label}
+                      </div>
                     </div>
-                    <div className="text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
-                      {stat.label}
-                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Member Info */}
+              <div className="card p-6">
+                <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
+                  📅 Member Info
+                </h2>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                    <span className="text-[var(--text-muted)]">Joined</span>
+                    <span className="text-[var(--text)] font-bold">
+                      {new Date(profile.createdAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </span>
                   </div>
-                ))}
+                  <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                    <span className="text-[var(--text-muted)]">Current Title</span>
+                    <span style={{ color }} className="font-bold">
+                      {profile.title || "Fresh Degen"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                    <span className="text-[var(--text-muted)]">Total XP</span>
+                    <span className="text-[var(--gold)] font-bold">{profile.xp.toLocaleString()} XP</span>
+                  </div>
+                  {profile.nextTitleProgress && (
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-[var(--text-muted)]">Next Title</span>
+                      <span className="text-[var(--text)]">
+                        {profile.nextTitleProgress.nextTitle} ({profile.nextTitleProgress.xpNeeded} XP away)
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "reports" && (
-            <div className="card p-6 text-center text-[var(--text-muted)]">
-              <p>Reports tab coming soon...</p>
-              <p className="mt-2">
-                This user has submitted {profile.stats.reports} reports.
-              </p>
-            </div>
+            <UserReportsList nickname={nickname} userColor={color} />
           )}
 
           {activeTab === "roasts" && (
-            <div className="card p-6 text-center text-[var(--text-muted)]">
-              <p>Roasts tab coming soon...</p>
-              <p className="mt-2">
-                This user has won {profile.stats.roastWins} roast competitions.
-              </p>
-            </div>
+            <UserRoastsList nickname={nickname} userColor={color} />
           )}
 
           {activeTab === "customize" && isOwnProfile && (

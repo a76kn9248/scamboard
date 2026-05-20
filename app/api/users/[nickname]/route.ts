@@ -102,6 +102,7 @@ export async function GET(
     const nextThreshold = getNextTitleThreshold(user.xp);
 
     return NextResponse.json({
+      id: user.id,
       nickname: user.nickname,
       bio: user.bio,
       profileColor: user.profileColor,
