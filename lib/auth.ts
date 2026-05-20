@@ -16,8 +16,11 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Lowercase email to match registration (which stores lowercase)
+        const email = credentials.email.toLowerCase().trim();
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user) {
