@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  nickname  String    @unique
+  createdAt DateTime  @default(now())
+  reports   Report[]
+  confirms  Confirm[]
+  comments  Comment[]
+}
+
+model Report {
+  id         String    @id @default(cuid())
+  type       String    // "deployer" or "twitter"
+  identifier String    // wallet address or twitter handle
+  reason     String
+  evidence   String?
+  author     User      @relation(fields: [authorId], references: [id])
+  authorId   String
+  confirms   Confirm[]
+  comments   Comment[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([identifier])
+  @@index([createdAt])
+}
+
+model Confirm {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reportId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  text      String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId  String
+  createdAt DateTime @default(now())
+}
