@@ -16,6 +16,8 @@ export async function GET() {
         identifier: scammer.identifier,
         type: scammer.type,
         totalConfirms: scammer.totalConfirms,
+        victimCount: scammer.victimCount,
+        weightedScore: scammer.weightedScore,
         reportCount: scammer.reportCount,
         roastTitle: scammer.roastTitle,
         shameLocked: scammer.shameLocked,

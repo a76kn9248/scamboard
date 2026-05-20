@@ -20,7 +20,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { turnstileToken } = body;
+    const { turnstileToken, isVictim } = body;
 
     // Verify Turnstile
     if (!turnstileToken) {
@@ -66,41 +66,81 @@ export async function POST(
     });
 
     if (existingConfirm) {
+      // If trying to upgrade to victim status
+      if (isVictim && !existingConfirm.isVictim) {
+        await prisma.confirm.update({
+          where: { id: existingConfirm.id },
+          data: { isVictim: true },
+        });
+
+        const [confirmCount, victimCount] = await Promise.all([
+          prisma.confirm.count({ where: { reportId } }),
+          prisma.confirm.count({ where: { reportId, isVictim: true } }),
+        ]);
+
+        // Award extra XP for victim upgrade (difference)
+        const xpResult = await awardXP(
+          session.user.id,
+          XP_REWARDS.VICTIM_CONFIRM - XP_REWARDS.CONFIRM_SCAMMER
+        );
+
+        return NextResponse.json({
+          message: "Marked as victim",
+          confirmed: true,
+          isVictim: true,
+          confirmCount,
+          victimCount,
+          xpAwarded: XP_REWARDS.VICTIM_CONFIRM - XP_REWARDS.CONFIRM_SCAMMER,
+          newTitle: xpResult.newTitle,
+        });
+      }
+
       // Toggle off - remove confirm
       await prisma.confirm.delete({
         where: { id: existingConfirm.id },
       });
 
-      const newCount = await prisma.confirm.count({
-        where: { reportId },
-      });
+      const [confirmCount, victimCount] = await Promise.all([
+        prisma.confirm.count({ where: { reportId } }),
+        prisma.confirm.count({ where: { reportId, isVictim: true } }),
+      ]);
 
       return NextResponse.json({
         message: "Confirm removed",
         confirmed: false,
-        confirmCount: newCount,
+        isVictim: false,
+        confirmCount,
+        victimCount,
       });
     } else {
       // Add confirm
+      const victimFlag = isVictim === true;
       await prisma.confirm.create({
         data: {
           userId: session.user.id,
           reportId,
+          isVictim: victimFlag,
         },
       });
 
-      const newCount = await prisma.confirm.count({
-        where: { reportId },
-      });
+      const [confirmCount, victimCount] = await Promise.all([
+        prisma.confirm.count({ where: { reportId } }),
+        prisma.confirm.count({ where: { reportId, isVictim: true } }),
+      ]);
 
-      // Award XP for confirming
-      const xpResult = await awardXP(session.user.id, XP_REWARDS.CONFIRM_SCAMMER);
+      // Award XP - more for victim confirms
+      const xpAmount = victimFlag
+        ? XP_REWARDS.VICTIM_CONFIRM
+        : XP_REWARDS.CONFIRM_SCAMMER;
+      const xpResult = await awardXP(session.user.id, xpAmount);
 
       return NextResponse.json({
-        message: "Report confirmed",
+        message: victimFlag ? "Confirmed as victim" : "Report confirmed",
         confirmed: true,
-        confirmCount: newCount,
-        xpAwarded: XP_REWARDS.CONFIRM_SCAMMER,
+        isVictim: victimFlag,
+        confirmCount,
+        victimCount,
+        xpAwarded: xpAmount,
         newTitle: xpResult.newTitle,
       });
     }

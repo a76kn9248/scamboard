@@ -15,11 +15,23 @@ export default function SubmitPage() {
 
   const [type, setType] = useState<"deployer" | "twitter">("deployer");
   const [identifier, setIdentifier] = useState("");
+  const [chain, setChain] = useState("ETH");
   const [reason, setReason] = useState("");
   const [evidence, setEvidence] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const CHAINS = [
+    { value: "ETH", label: "Ethereum" },
+    { value: "SOL", label: "Solana" },
+    { value: "BSC", label: "BNB Chain" },
+    { value: "BASE", label: "Base" },
+    { value: "ARB", label: "Arbitrum" },
+    { value: "MATIC", label: "Polygon" },
+    { value: "AVAX", label: "Avalanche" },
+    { value: "OTHER", label: "Other" },
+  ];
 
   if (status === "loading") {
     return (
@@ -74,6 +86,7 @@ export default function SubmitPage() {
         body: JSON.stringify({
           type,
           identifier: identifier.trim(),
+          chain,
           reason: reason.trim(),
           evidence: evidence.trim() || null,
           turnstileToken,
@@ -168,6 +181,26 @@ export default function SubmitPage() {
                 />
               </div>
 
+              {/* Chain */}
+              {type === "deployer" && (
+                <div>
+                  <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                    Chain
+                  </label>
+                  <select
+                    value={chain}
+                    onChange={(e) => setChain(e.target.value)}
+                    className="input"
+                  >
+                    {CHAINS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Reason */}
               <div>
                 <label className="block text-sm text-[var(--foreground-muted)] mb-2">
@@ -247,6 +280,11 @@ export default function SubmitPage() {
                     >
                       {type}
                     </span>
+                    {type === "deployer" && (
+                      <span className="badge bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
+                        {chain}
+                      </span>
+                    )}
                     <ThreatBadge confirmCount={0} size="sm" />
                   </div>
 

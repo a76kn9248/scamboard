@@ -16,8 +16,14 @@ import ShameMessage from "@/components/ShameMessage";
 interface Comment {
   id: string;
   text: string;
+  authorId: string;
   authorNickname: string;
+  authorColor?: string;
+  parentId?: string | null;
+  score: number;
+  userVote: number;
   createdAt: string;
+  replies?: Comment[];
 }
 
 interface Report {

@@ -10,6 +10,8 @@ import LinkedWallets from "@/components/LinkedWallets";
 import BountyPool from "@/components/BountyPool";
 import RapSheet from "@/components/RapSheet";
 import Timeline from "@/components/Timeline";
+import CommentThread from "@/components/CommentThread";
+import TurnstileWidget from "@/components/TurnstileWidget";
 import { getThreatLevel } from "@/lib/threat-levels";
 
 interface Report {
@@ -39,21 +41,24 @@ interface ScammerData {
   type: string;
   chain: string;
   totalConfirms: number;
+  victimCount: number;
   reportCount: number;
   reports: Report[];
   roastTitle: string | null;
   shameLocked: boolean;
   firstReportDate: string;
   latestReportDate: string;
+  primaryReportId: string;
 }
 
 export default function ScammerProfileClient({ identifier }: { identifier: string }) {
   const { data: session } = useSession();
   const [scammer, setScammer] = useState<ScammerData | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentSort, setCommentSort] = useState("top");
-  const [commentText, setCommentText] = useState("");
+  const [watching, setWatching] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/reports?search=${encodeURIComponent(identifier)}&limit=100`)
@@ -69,6 +74,10 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
               (sum: number, r: { confirmCount: number }) => sum + r.confirmCount,
               0
             );
+            const victimCount = matchingReports.reduce(
+              (sum: number, r: { victimCount?: number }) => sum + (r.victimCount || 0),
+              0
+            );
             const dates = matchingReports.map((r: { createdAt: string }) => new Date(r.createdAt));
 
             fetch(`/api/reports/${matchingReports[0].id}/roasts`)
@@ -79,7 +88,9 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
                   type: matchingReports[0].type,
                   chain: matchingReports[0].chain || "ETH",
                   totalConfirms,
+                  victimCount,
                   reportCount: matchingReports.length,
+                  primaryReportId: matchingReports[0].id,
                   reports: matchingReports.map((r: {
                     id: string;
                     reason: string;
@@ -117,7 +128,78 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
         }
       })
       .catch(() => setLoading(false));
-  }, [identifier]);
+
+    // Check if watching
+    if (session) {
+      fetch("/api/watch/mine")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.scammers?.includes(identifier)) {
+            setWatching(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [identifier, session]);
+
+  const handleWatch = async () => {
+    if (!turnstileToken || !session) return;
+    setActionLoading("watch");
+
+    try {
+      const res = await fetch("/api/watch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetType: "scammer",
+          targetId: identifier,
+          turnstileToken,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setWatching(data.watching);
+      }
+    } catch (err) {
+      console.error("Error toggling watch:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleVictimConfirm = async () => {
+    if (!turnstileToken || !session || !scammer) return;
+    setActionLoading("victim");
+
+    try {
+      const res = await fetch(`/api/reports/${scammer.primaryReportId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isVictim: true,
+          turnstileToken,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setScammer((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalConfirms: data.confirmCount,
+                victimCount: data.victimCount,
+              }
+            : null
+        );
+      }
+    } catch (err) {
+      console.error("Error confirming as victim:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -265,22 +347,40 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
               {scammer.totalConfirms}
             </div>
             <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider mt-1">
-              confirms {"\u00B7"} {scammer.reportCount} reports {"\u00B7"} {scammer.reports[0]?.commentCount || 0} comments
+              {scammer.totalConfirms} confirms {"\u00B7"} {scammer.victimCount} victims {"\u00B7"} {scammer.reportCount} reports
             </div>
 
-            <div className="flex gap-2 mt-[18px] justify-end">
-              <button className="btn-secondary text-[12px] py-2 px-3.5">
-                {"\u{1F441}"} Watch
-              </button>
-              <button className="btn-secondary text-[12px] py-2 px-3.5">
+            {session && (
+              <div className="mt-3">
+                <TurnstileWidget onVerify={setTurnstileToken} />
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-[18px] justify-end flex-wrap">
+              {session && (
+                <button
+                  onClick={handleWatch}
+                  disabled={actionLoading === "watch" || !turnstileToken}
+                  className={`btn-secondary text-[12px] py-2 px-3.5 disabled:opacity-50 ${watching ? "border-[var(--red)] text-[var(--red)]" : ""}`}
+                >
+                  {"\u{1F441}"} {watching ? "Watching" : "Watch"}
+                </button>
+              )}
+              <Link href={`/report/${scammer.primaryReportId}#evidence`} className="btn-secondary text-[12px] py-2 px-3.5">
                 {"\u{1F4CE}"} Add evidence
-              </button>
-              <button className="btn-secondary text-[12px] py-2 px-3.5">
+              </Link>
+              <Link href={`/report/${scammer.primaryReportId}#roasts`} className="btn-secondary text-[12px] py-2 px-3.5">
                 {"\u{1F525}"} Roast
-              </button>
-              <button className="btn-primary text-[12px] py-2 px-3.5">
-                {"\u2713"} I was rugged too
-              </button>
+              </Link>
+              {session && (
+                <button
+                  onClick={handleVictimConfirm}
+                  disabled={actionLoading === "victim" || !turnstileToken}
+                  className="btn-primary text-[12px] py-2 px-3.5 disabled:opacity-50"
+                >
+                  {actionLoading === "victim" ? "..." : "\u2713"} I was rugged too
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -319,10 +419,10 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
           </div>
 
           {/* Receipts Gallery */}
-          <ReceiptsGallery />
+          <ReceiptsGallery reportId={scammer.primaryReportId} identifier={scammer.identifier} />
 
           {/* Linked Wallets */}
-          <LinkedWallets />
+          <LinkedWallets reportId={scammer.primaryReportId} identifier={scammer.identifier} />
 
           {/* Discussion */}
           <div className="card overflow-hidden">
@@ -330,9 +430,6 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
               <span>{"\u{1F4AC}"}</span>
               <span className="font-display font-black text-[14px] text-[var(--text)]">
                 Discussion
-              </span>
-              <span className="bg-[var(--border)] text-[var(--text-secondary)] text-[10px] px-2 py-0.5 rounded-full font-mono">
-                {scammer.reports[0]?.commentCount || 0}
               </span>
             </div>
 
@@ -347,40 +444,11 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
                   {sort}
                 </button>
               ))}
-              <span className="ml-auto text-[var(--text-muted)] cursor-pointer">
-                collapse all
-              </span>
             </div>
 
-            {/* Comment composer */}
-            {session && (
-              <div className="flex gap-3 p-4 border-b border-[var(--border)] items-start">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center font-display font-black text-white"
-                  style={{ background: "#ff3b9a" }}
-                >
-                  {session.user.name?.[0]?.toUpperCase() || "?"}
-                </div>
-                <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Drop a receipt, share a transaction trail, or just let it rip..."
-                  className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded-md p-3 text-[12px] text-[var(--text-muted)] min-h-[60px] resize-none"
-                />
-                <button className="btn-primary text-[12px] py-2 px-4 self-stretch">
-                  post
-                </button>
-              </div>
-            )}
-
-            {/* Comments placeholder */}
-            <div className="p-6 text-center text-[var(--text-muted)] text-[12px]">
-              <p>Comments loading...</p>
-              <p className="mt-2">
-                <Link href={`/report/${scammer.reports[0]?.id}`} className="text-[var(--red)] hover:underline">
-                  View full report with all comments {"\u2192"}
-                </Link>
-              </p>
+            {/* Threaded Comments */}
+            <div className="p-4">
+              <CommentThread reportId={scammer.primaryReportId} />
             </div>
           </div>
         </div>
@@ -388,8 +456,8 @@ export default function ScammerProfileClient({ identifier }: { identifier: strin
         {/* Sidebar */}
         <div className="space-y-4">
           <BountyPool />
-          <RapSheet />
-          <Timeline />
+          <RapSheet identifier={scammer.identifier} />
+          <Timeline identifier={scammer.identifier} />
 
           {/* Same Pattern */}
           <div className="card overflow-hidden">

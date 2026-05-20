@@ -7,6 +7,10 @@ export const XP_REWARDS = {
   SUBMIT_ROAST: 5,
   ROAST_WINS: 25,
   ADD_BOUNTY: 5,
+  ADD_LINKED_WALLET: 5,
+  ADD_EVIDENCE: 5,
+  CONFIRM_LINKED_WALLET: 2,
+  VICTIM_CONFIRM: 5,
 } as const;
 
 export const TITLE_THRESHOLDS = [

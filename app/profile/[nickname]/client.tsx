@@ -249,7 +249,7 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
           />
 
           {/* Achievement stickers */}
-          <AchievementStickers />
+          <AchievementStickers nickname={nickname} />
         </div>
 
         {/* Right column */}
@@ -369,6 +369,7 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
 
               {/* Top 8 Watchdogs */}
               <Top8Watchdogs
+                nickname={nickname}
                 ownerNickname={nickname}
                 editable={isOwnProfile}
                 size="md"

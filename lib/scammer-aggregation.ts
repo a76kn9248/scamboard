@@ -4,6 +4,8 @@ export interface AggregatedScammer {
   identifier: string;
   type: string;
   totalConfirms: number;
+  victimCount: number;
+  weightedScore: number; // totalConfirms + victimCount (victims count 2x)
   reportCount: number;
   reports: {
     id: string;
@@ -12,6 +14,7 @@ export interface AggregatedScammer {
     authorNickname: string;
     createdAt: Date;
     confirmCount: number;
+    victimCount: number;
     commentCount: number;
   }[];
   roastTitle: string | null;
@@ -42,6 +45,8 @@ export async function getAggregatedScammer(identifier: string): Promise<Aggregat
   if (reports.length === 0) return null;
 
   const totalConfirms = reports.reduce((sum, r) => sum + r.confirms.length, 0);
+  const victimCount = reports.reduce((sum, r) => sum + r.confirms.filter(c => c.isVictim).length, 0);
+  const weightedScore = totalConfirms + victimCount; // victims count 2x (once in totalConfirms, once here)
 
   // Find the locked roast title or the top voted roast
   let roastTitle: string | null = null;
@@ -72,6 +77,8 @@ export async function getAggregatedScammer(identifier: string): Promise<Aggregat
     identifier: reports[0].identifier,
     type: reports[0].type,
     totalConfirms,
+    victimCount,
+    weightedScore,
     reportCount: reports.length,
     reports: reports.map(r => ({
       id: r.id,
@@ -80,6 +87,7 @@ export async function getAggregatedScammer(identifier: string): Promise<Aggregat
       authorNickname: r.author.nickname,
       createdAt: r.createdAt,
       confirmCount: r.confirms.length,
+      victimCount: r.confirms.filter(c => c.isVictim).length,
       commentCount: r.comments.length,
     })),
     roastTitle,
@@ -110,19 +118,24 @@ export async function getTopScammers(limit: number = 10): Promise<AggregatedScam
     scammerMap.get(key)!.push(report);
   }
 
-  // Calculate totals and sort
-  const scammers: { identifier: string; totalConfirms: number; reports: typeof reports }[] = [];
+  // Calculate totals and sort by weighted score (victims count 2x)
+  const scammers: { identifier: string; totalConfirms: number; victimCount: number; weightedScore: number; reports: typeof reports }[] = [];
 
   for (const [, reportGroup] of scammerMap) {
     const totalConfirms = reportGroup.reduce((sum, r) => sum + r.confirms.length, 0);
+    const victimCount = reportGroup.reduce((sum, r) => sum + r.confirms.filter(c => c.isVictim).length, 0);
+    const weightedScore = totalConfirms + victimCount; // victims count 2x
     scammers.push({
       identifier: reportGroup[0].identifier,
       totalConfirms,
+      victimCount,
+      weightedScore,
       reports: reportGroup,
     });
   }
 
-  scammers.sort((a, b) => b.totalConfirms - a.totalConfirms);
+  // Sort by weighted score (victims count double)
+  scammers.sort((a, b) => b.weightedScore - a.weightedScore);
 
   // Get top N with full details
   const topScammers: AggregatedScammer[] = [];
@@ -161,6 +174,8 @@ export async function getTopScammers(limit: number = 10): Promise<AggregatedScam
       identifier: scammer.identifier,
       type: scammer.reports[0].type,
       totalConfirms: scammer.totalConfirms,
+      victimCount: scammer.victimCount,
+      weightedScore: scammer.weightedScore,
       reportCount: scammer.reports.length,
       reports: scammer.reports.map(r => ({
         id: r.id,
@@ -169,6 +184,7 @@ export async function getTopScammers(limit: number = 10): Promise<AggregatedScam
         authorNickname: r.author.nickname,
         createdAt: r.createdAt,
         confirmCount: r.confirms.length,
+        victimCount: r.confirms.filter(c => c.isVictim).length,
         commentCount: r.comments.length,
       })),
       roastTitle,
