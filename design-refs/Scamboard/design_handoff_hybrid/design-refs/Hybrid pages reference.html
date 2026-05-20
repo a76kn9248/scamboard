@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scamboard — hybrid direction reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0807; font-family: Inter, system-ui, sans-serif; color: #ece6df; }
+  .divider { padding: 40px 22px 18px; max-width: 1280px; margin: 0 auto; }
+  .divider h2 { font-family: Tahoma, sans-serif; font-weight: 900; font-size: 22px; margin: 0; color: #f5e7d8; letter-spacing: -0.3px; }
+  .divider p { color: #8a7d72; margin: 6px 0 0; font-size: 13px; }
+  .frame { max-width: 1280px; margin: 0 auto; border: 1px solid #2c211f; border-radius: 12px; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div class="divider">
+  <h2>1 · Home feed</h2>
+  <p>Karma gutter · subscammer chips · sticker threat badges · profileColor accent · Top 8 Most Wanted · Top 8 Watchdogs sidebar.</p>
+</div>
+<div class="frame"><div id="home"></div></div>
+
+<div class="divider">
+  <h2>2 · Scammer dossier (case file)</h2>
+  <p>Mugshot frame · threat tier · receipts gallery · linked-wallets graph · bounty pool · timeline · threaded discussion.</p>
+</div>
+<div class="frame"><div id="scammer"></div></div>
+
+<div class="divider">
+  <h2>3 · User profile (MySpace-style)</h2>
+  <p>Banner washed in user's profileColor · sticker achievements · theme song slot · Top 8 Watchdogs grid · the wall.</p>
+</div>
+<div class="frame"><div id="user"></div></div>
+
+<div style="height: 40px"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="shared-data.jsx"></script>
+<script type="text/babel" src="direction-c-hybrid.jsx"></script>
+<script type="text/babel" src="hybrid-scammer.jsx"></script>
+<script type="text/babel" src="hybrid-user.jsx"></script>
+<script type="text/babel">
+  ReactDOM.createRoot(document.getElementById('home')).render(<HybridHome />);
+  ReactDOM.createRoot(document.getElementById('scammer')).render(<HybridScammer />);
+  ReactDOM.createRoot(document.getElementById('user')).render(<HybridUser />);
+</script>
+</body>
+</html>
