@@ -10,57 +10,58 @@ export interface ThreatInfo {
   animated: boolean;
 }
 
+// Updated threat levels with new warm palette colors
 export function getThreatLevel(confirmCount: number): ThreatInfo {
   if (confirmCount >= 25) {
     return {
       level: 'LEGENDARY',
-      color: '#ff1744',
-      bgColor: 'rgba(255, 23, 68, 0.2)',
-      borderColor: '#ff1744',
-      glowColor: 'rgba(255, 23, 68, 0.5)',
-      fireEmojis: '\u{1F480}',
+      color: '#ff3b6c',
+      bgColor: '#2c1418',
+      borderColor: '#ff3b6c',
+      glowColor: 'rgba(255, 59, 108, 0.4)',
+      fireEmojis: '\u{1F480}', // skull
       animated: true,
     };
   }
   if (confirmCount >= 11) {
     return {
       level: 'EXTREME',
-      color: '#ff1744',
-      bgColor: 'rgba(255, 23, 68, 0.15)',
-      borderColor: '#ff1744',
-      glowColor: 'rgba(255, 23, 68, 0.3)',
-      fireEmojis: '\u{1F525}\u{1F525}\u{1F525}',
+      color: '#ff7a3a',
+      bgColor: '#2a1810',
+      borderColor: '#ff7a3a',
+      glowColor: 'rgba(255, 122, 58, 0.3)',
+      fireEmojis: '\u{1F525}\u{1F525}\u{1F525}', // 3 fire
       animated: false,
     };
   }
   if (confirmCount >= 6) {
     return {
       level: 'HIGH',
-      color: '#ff9100',
-      bgColor: 'rgba(255, 145, 0, 0.15)',
-      borderColor: '#ff9100',
-      glowColor: 'rgba(255, 145, 0, 0.3)',
-      fireEmojis: '\u{1F525}\u{1F525}',
+      color: '#ffc547',
+      bgColor: '#2a2010',
+      borderColor: '#ffc547',
+      glowColor: 'rgba(255, 197, 71, 0.3)',
+      fireEmojis: '\u{1F525}\u{1F525}', // 2 fire
       animated: false,
     };
   }
   if (confirmCount >= 3) {
     return {
       level: 'MEDIUM',
-      color: '#ffd600',
-      bgColor: 'rgba(255, 214, 0, 0.15)',
-      borderColor: '#ffd600',
-      glowColor: 'rgba(255, 214, 0, 0.3)',
-      fireEmojis: '\u{1F525}',
+      color: '#6ce28a',
+      bgColor: '#102a1c',
+      borderColor: '#6ce28a',
+      glowColor: 'rgba(108, 226, 138, 0.3)',
+      fireEmojis: '\u{1F525}', // 1 fire
       animated: false,
     };
   }
   return {
     level: 'LOW',
-    color: '#69f0ae',
-    bgColor: 'rgba(105, 240, 174, 0.1)',
-    borderColor: '#69f0ae',
-    glowColor: 'rgba(105, 240, 174, 0.2)',
+    color: '#5cd0e2',
+    bgColor: '#0e2228',
+    borderColor: '#5cd0e2',
+    glowColor: 'rgba(92, 208, 226, 0.2)',
     fireEmojis: '',
     animated: false,
   };

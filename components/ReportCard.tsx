@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
 import ThreatBadge from "./ThreatBadge";
-import ScammerAvatar from "./ScammerAvatar";
-import BountyBadge from "./BountyBadge";
+import KarmaGutter from "./KarmaGutter";
 import { getThreatLevel } from "@/lib/threat-levels";
 
 interface ReportCardProps {
@@ -14,121 +13,149 @@ interface ReportCardProps {
     identifier: string;
     reason: string;
     authorNickname: string;
+    authorColor?: string;
+    authorTitle?: string;
     confirmCount: number;
     commentCount: number;
     createdAt: string;
     rank: number;
     roastTitle?: string | null;
     bountyCount?: number;
+    chain?: string;
+    subscammer?: string;
+    userVote?: "up" | "down" | null;
   };
+  compact?: boolean;
 }
 
 function truncateIdentifier(identifier: string, type: string): string {
   if (type === "twitter") {
     return `@${identifier}`;
   }
-  if (identifier.length > 16) {
-    return `${identifier.slice(0, 8)}...${identifier.slice(-6)}`;
+  if (identifier.length > 20) {
+    return `${identifier.slice(0, 12)}...${identifier.slice(-8)}`;
   }
   return identifier;
 }
 
-export default function ReportCard({ report }: ReportCardProps) {
+export default function ReportCard({ report, compact = false }: ReportCardProps) {
   const threatInfo = getThreatLevel(report.confirmCount);
+  const authorColor = report.authorColor || "#ff3b9a";
+  const subscammer = report.subscammer || (report.type === "twitter" ? "twitterscams" : "rugpulls");
 
   return (
-    <Link href={`/report/${report.id}`}>
+    <div className="card overflow-hidden mb-2 hover:border-[var(--border-hover)] transition-all group">
+      {/* Left accent in author's color */}
       <div
-        className={`card p-4 hover-glow transition-all cursor-pointer group ${
-          threatInfo.animated ? "animate-border-glow" : ""
-        }`}
-      >
-        <div className="flex items-start gap-4">
-          {/* Rank & Avatar */}
-          <div className="flex flex-col items-center gap-2">
-            <div
-              className={`text-2xl font-black ${
-                report.rank === 1
-                  ? "text-[var(--gold-primary)]"
-                  : report.rank === 2
-                  ? "text-gray-300"
-                  : report.rank === 3
-                  ? "text-amber-600"
-                  : "text-[var(--red-primary)]"
-              }`}
-            >
-              #{report.rank}
-            </div>
-            <ScammerAvatar identifier={report.identifier} size="sm" />
-          </div>
+        className="absolute inset-y-0 left-0 w-[3px] transition-all group-hover:brightness-115"
+        style={{
+          background: authorColor,
+          boxShadow: `0 0 12px ${authorColor}88`,
+        }}
+      />
 
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              {/* Type badge */}
+      <div className="grid grid-cols-[48px_1fr] gap-0">
+        {/* Karma Gutter */}
+        <KarmaGutter
+          reportId={report.id}
+          score={report.confirmCount}
+          rank={report.rank}
+          initialVoted={report.userVote || null}
+        />
+
+        {/* Main Content */}
+        <Link href={`/report/${report.id}`} className="block">
+          <div className="p-3 pl-4">
+            {/* Meta header */}
+            <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] mb-1.5 flex-wrap">
+              <span className="font-display font-bold text-[var(--text-secondary)] hover:text-[var(--red)]">
+                r/{subscammer}
+              </span>
+              <span className="text-[var(--text-faint)]">{"\u00B7"}</span>
+              <span>posted {formatDistanceToNow(new Date(report.createdAt))} by</span>
+
+              {/* Author chip */}
               <span
-                className={`badge ${
-                  report.type === "deployer" ? "badge-purple" : "badge-success"
-                }`}
+                className="author-chip"
+                style={{
+                  background: `${authorColor}22`,
+                  color: authorColor,
+                  border: `1px solid ${authorColor}44`,
+                }}
               >
-                {report.type}
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: authorColor }}
+                />
+                @{report.authorNickname}
+                {report.authorTitle && (
+                  <span className="opacity-70 font-normal">
+                    {" "}{"\u00B7"} {report.authorTitle}
+                  </span>
+                )}
               </span>
 
-              {/* Threat level */}
-              <ThreatBadge confirmCount={report.confirmCount} size="sm" />
+              <span className="text-[var(--text-faint)]">{"\u00B7"}</span>
+              <span>chain {report.chain || "ETH"}</span>
 
-              {/* Bounty badge */}
-              {report.bountyCount && report.bountyCount > 0 && (
-                <BountyBadge count={report.bountyCount} />
+              {/* Right side: flairs + threat badge */}
+              <span className="ml-auto flex items-center gap-1.5">
+                <span className={`flair flair-${report.type}`}>{report.type}</span>
+                <ThreatBadge confirmCount={report.confirmCount} size="sm" />
+                {report.bountyCount && report.bountyCount > 0 && (
+                  <span className="flair flair-bounty">
+                    {"\u{1F4B0}"} {report.bountyCount}
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Title row: identifier + roast title */}
+            <div className="font-display text-[17px] font-black tracking-tight text-[var(--text)] leading-tight mb-1.5 flex items-baseline gap-2 flex-wrap">
+              <span className="font-mono text-[14px] font-semibold tracking-normal">
+                {truncateIdentifier(report.identifier, report.type)}
+              </span>
+              {report.roastTitle && (
+                <>
+                  <span className="text-[var(--text-faint)]">{"\u2014"}</span>
+                  <span className="roast-title font-display font-semibold">
+                    {report.roastTitle}
+                  </span>
+                </>
               )}
             </div>
 
-            {/* Identifier */}
-            <div className="text-lg font-bold text-[var(--foreground)] group-hover:text-[var(--red-primary)] transition-colors mb-1 truncate">
-              {truncateIdentifier(report.identifier, report.type)}
-            </div>
-
-            {/* Roast Title */}
-            {report.roastTitle && (
-              <p className="roast-title text-sm mb-2 line-clamp-1">
-                {report.roastTitle}
+            {/* Reason text */}
+            {!compact && (
+              <p className="text-[var(--text-secondary)] text-[12.5px] leading-relaxed line-clamp-2 mb-2.5">
+                {report.reason}
               </p>
             )}
 
-            {/* Reason preview */}
-            <p className="text-[var(--foreground-muted)] text-sm line-clamp-2 mb-3">
-              {report.reason}
-            </p>
-
-            {/* Meta */}
-            <div className="flex items-center gap-4 text-xs text-[var(--foreground-dimmed)]">
-              <Link
-                href={`/profile/${report.authorNickname}`}
-                onClick={(e) => e.stopPropagation()}
-                className="text-[var(--green-primary)] hover:underline"
-              >
-                @{report.authorNickname}
-              </Link>
-              <span>{formatDistanceToNow(new Date(report.createdAt))}</span>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <div className="flex items-center gap-1">
-              <span className="text-[var(--red-primary)] text-lg font-bold">
-                {threatInfo.fireEmojis || "\u{1F525}"} {report.confirmCount}
+            {/* Actions */}
+            <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u{1F4AC}"} {report.commentCount} comments
               </span>
-            </div>
-            <span className="text-xs text-[var(--foreground-dimmed)]">confirms</span>
-            <div className="flex items-center gap-1 mt-2">
-              <span className="text-[var(--foreground-muted)]">
-                &#x1F4AC; {report.commentCount}
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u{1F4CE}"} evidence (3)
+              </span>
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u{1F4B0}"} add bounty
+              </span>
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u{1F525}"} roast it
+              </span>
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u{1F517}"} linked wallets (4)
+              </span>
+              <span className="hover:text-[var(--text)] cursor-pointer">
+                {"\u2197"} share
               </span>
             </div>
           </div>
-        </div>
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }

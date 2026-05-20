@@ -6,39 +6,58 @@ interface ThreatBadgeProps {
   confirmCount: number;
   showFire?: boolean;
   size?: "sm" | "md" | "lg";
+  showTier?: boolean;
 }
 
 export default function ThreatBadge({
   confirmCount,
   showFire = true,
   size = "md",
+  showTier = false,
 }: ThreatBadgeProps) {
   const threatInfo = getThreatLevel(confirmCount);
+  const isLegendary = threatInfo.level === "LEGENDARY";
 
-  const sizeClasses = {
-    sm: "text-xs px-2 py-0.5",
-    md: "text-xs px-3 py-1",
-    lg: "text-sm px-4 py-1.5",
+  // Size-specific styles
+  const sizeStyles = {
+    sm: "text-[9px] px-2 py-[2px]",
+    md: "text-[10px] px-2 py-[2px]",
+    lg: "text-[12px] px-3 py-1",
   };
 
-  const threatClasses: Record<ThreatLevel, string> = {
-    LOW: "threat-low",
-    MEDIUM: "threat-medium",
-    HIGH: "threat-high",
-    EXTREME: "threat-extreme",
-    LEGENDARY: "threat-legendary",
+  // Tier number based on threat level
+  const tierNumber: Record<ThreatLevel, string> = {
+    LOW: "1",
+    MEDIUM: "2",
+    HIGH: "3",
+    EXTREME: "4",
+    LEGENDARY: "5",
   };
 
   return (
     <span
-      className={`badge ${threatClasses[threatInfo.level]} ${sizeClasses[size]} ${
-        threatInfo.animated ? "animate-legendary-glow" : ""
-      }`}
+      className={`
+        threat-sticker ${threatInfo.level}
+        ${sizeStyles[size]}
+        ${isLegendary ? "" : ""}
+      `}
+      style={{
+        color: threatInfo.color,
+        background: threatInfo.bgColor,
+        borderColor: threatInfo.color,
+        boxShadow: isLegendary ? `0 0 12px ${threatInfo.glowColor}` : `2px 2px 0 #14100f`,
+      }}
     >
       {showFire && threatInfo.fireEmojis && (
-        <span className="mr-1">{threatInfo.fireEmojis}</span>
+        <span>{threatInfo.fireEmojis}</span>
       )}
-      {threatInfo.level}
+      <span>{threatInfo.level}</span>
+      {showTier && (
+        <span className="opacity-70">
+          {" "}
+          {"\u00B7"} TIER {tierNumber[threatInfo.level]}
+        </span>
+      )}
     </span>
   );
 }

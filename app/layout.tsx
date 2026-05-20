@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Rubik } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+const inter = Inter({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-});
-
-const rubik = Rubik({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["400", "700", "900"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -40,8 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} ${rubik.variable} antialiased`}>
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] font-mono flex flex-col">
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col">
         <Providers>
           {/* Grain overlay */}
           <div className="grain-overlay" aria-hidden="true" />

@@ -20,6 +20,11 @@ export async function GET(
         profileColor: true,
         title: true,
         xp: true,
+        mood: true,
+        currentlyDoing: true,
+        specialty: true,
+        themeSongUrl: true,
+        themeSongLabel: true,
         createdAt: true,
         _count: {
           select: {
@@ -102,6 +107,11 @@ export async function GET(
       profileColor: user.profileColor,
       title: user.title,
       xp: user.xp,
+      mood: user.mood,
+      currentlyDoing: user.currentlyDoing,
+      specialty: user.specialty,
+      themeSongUrl: user.themeSongUrl,
+      themeSongLabel: user.themeSongLabel,
       nextTitleProgress: nextThreshold,
       createdAt: user.createdAt,
       stats: {

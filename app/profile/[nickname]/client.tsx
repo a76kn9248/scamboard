@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
-import XPBar from "@/components/XPBar";
-import ColorPicker from "@/components/ColorPicker";
-import ShameMessage from "@/components/ShameMessage";
+import MoodWidget from "@/components/MoodWidget";
+import ThemeSongPlayer from "@/components/ThemeSongPlayer";
+import AchievementStickers from "@/components/AchievementStickers";
+import Top8Watchdogs from "@/components/Top8Watchdogs";
+import Wall from "@/components/Wall";
 
 interface UserProfile {
   nickname: string;
@@ -14,6 +16,11 @@ interface UserProfile {
   profileColor: string | null;
   title: string | null;
   xp: number;
+  mood?: string;
+  currentlyDoing?: string;
+  specialty?: string;
+  themeSongUrl?: string;
+  themeSongLabel?: string;
   nextTitleProgress: {
     nextTitle: string;
     xpNeeded: number;
@@ -27,39 +34,13 @@ interface UserProfile {
     roasts: number;
     roastWins: number;
   };
-  recentActivity: {
-    reports: Array<{
-      type: string;
-      reportId: string;
-      identifier: string;
-      reportType: string;
-      createdAt: string;
-    }>;
-    confirms: Array<{
-      type: string;
-      reportId: string;
-      identifier: string;
-      reportType: string;
-      createdAt: string;
-    }>;
-    comments: Array<{
-      type: string;
-      reportId: string;
-      identifier: string;
-      preview: string;
-      createdAt: string;
-    }>;
-  };
 }
 
 export default function UserProfileClient({ nickname }: { nickname: string }) {
   const { data: session } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editBio, setEditBio] = useState("");
-  const [editColor, setEditColor] = useState("#ff1744");
-  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("about");
 
   const isOwnProfile = session?.user?.name === nickname;
 
@@ -71,50 +52,22 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
           setProfile(null);
         } else {
           setProfile(data);
-          setEditBio(data.bio || "");
-          setEditColor(data.profileColor || "#ff1744");
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [nickname]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/users/me", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio: editBio, profileColor: editColor }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setProfile((prev) =>
-          prev
-            ? {
-                ...prev,
-                bio: data.user.bio,
-                profileColor: data.user.profileColor,
-              }
-            : null
-        );
-        setIsEditing(false);
-      }
-    } catch (error) {
-      console.error("Error saving profile:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="skeleton h-64 rounded-lg mb-6" />
-          <div className="skeleton h-32 rounded-lg mb-6" />
-          <div className="skeleton h-48 rounded-lg" />
+      <div className="min-h-screen">
+        <div className="skeleton h-[220px]" />
+        <div className="max-w-[1280px] mx-auto px-[22px] py-5 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5 -mt-20">
+          <div className="skeleton h-[500px] rounded-[12px]" />
+          <div className="space-y-4">
+            <div className="skeleton h-12 rounded-[10px]" />
+            <div className="skeleton h-40 rounded-[10px]" />
+          </div>
         </div>
       </div>
     );
@@ -124,9 +77,9 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
     return (
       <div className="min-h-screen py-12 px-4 text-center">
         <div className="max-w-xl mx-auto">
-          <span className="text-6xl mb-4 block">&#x1F47B;</span>
-          <h1 className="text-2xl font-bold text-[var(--foreground)] mb-4">User Not Found</h1>
-          <p className="text-[var(--foreground-muted)] mb-6">
+          <span className="text-6xl mb-4 block">{"\u{1F47B}"}</span>
+          <h1 className="text-2xl font-bold text-[var(--text)] mb-4">User Not Found</h1>
+          <p className="text-[var(--text-muted)] mb-6">
             This watchdog doesn&apos;t exist. Maybe they got rugged too?
           </p>
           <Link href="/" className="btn-primary">
@@ -137,243 +90,356 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
     );
   }
 
-  const profileColor = profile.profileColor || "#ff1744";
+  const color = profile.profileColor || "#ff3b9a";
+  const xpProgress = profile.nextTitleProgress?.progress || Math.min((profile.xp / 5000) * 100, 100);
 
-  // Merge all activity and sort by date
-  const allActivity = [
-    ...profile.recentActivity.reports,
-    ...profile.recentActivity.confirms,
-    ...profile.recentActivity.comments,
-  ].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const tabs = [
+    { id: "about", label: "\u{1F4CB} About" },
+    { id: "stats", label: "\u{1F4CA} Stats" },
+    { id: "reports", label: `\u{1F3AF} Reports \u00B7 ${profile.stats.reports}` },
+    { id: "wall", label: "\u{1F4AC} Wall" },
+    { id: "roasts", label: `\u{1F3C6} Roasts \u00B7 ${profile.stats.roastWins}` },
+    ...(isOwnProfile ? [{ id: "customize", label: "\u2699 Customize" }] : []),
+  ];
+
+  const memberSince = new Date(profile.createdAt);
+  const memberSinceText = `${memberSince.toLocaleString("en-US", { month: "short" })} ${memberSince.getFullYear()}`;
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Profile Card */}
+    <div className="min-h-screen" style={{ "--usercolor": color } as React.CSSProperties}>
+      {/* Breadcrumb nav */}
+      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-[22px] py-2.5 flex items-center gap-3.5 text-[12px] text-[var(--text-muted)]">
+        <Link href="/" style={{ color }} className="hover:underline">
+          {"\u2190"} back to feed
+        </Link>
+        <span className="text-[var(--text-faint)]">/</span>
+        <span className="text-[var(--text-secondary)]">watchdogs</span>
+        <span className="text-[var(--text-faint)]">/</span>
+        <span className="text-[var(--text)]">@{nickname}</span>
+        <span className="ml-auto text-[var(--text-muted)]">
+          this profile is themed by its owner {"\u00B7"}{" "}
+          <span style={{ color }} className="cursor-pointer hover:underline">
+            change skin
+          </span>
+        </span>
+      </div>
+
+      {/* Banner */}
+      <div
+        className="h-[220px] relative overflow-hidden"
+        style={{
+          background: `
+            radial-gradient(circle at 15% 20%, ${color}66 0%, transparent 50%),
+            radial-gradient(circle at 85% 80%, rgba(255, 197, 71, 0.27) 0%, transparent 45%),
+            repeating-linear-gradient(45deg, #1a1413 0 14px, #14100f 14px 28px)
+          `,
+        }}
+      >
+        {/* Watermark */}
         <div
-          className="card p-6 mb-6"
-          style={{ borderColor: profileColor, borderWidth: "2px" }}
+          className="absolute top-[30px] right-[40px] font-display font-black text-[140px] leading-none tracking-[-6px] pointer-events-none select-none"
+          style={{
+            color: `${color}11`,
+            transform: "rotate(-6deg)",
+          }}
         >
-          <div className="flex items-start gap-6">
-            {/* Avatar */}
+          {nickname.toUpperCase().split(".")[0]}
+        </div>
+
+        {/* Gradient fade */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(180deg, transparent 60%, #14100f)",
+          }}
+        />
+      </div>
+
+      {/* Main content */}
+      <div className="max-w-[1280px] mx-auto px-[22px] pb-8 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-[22px] -mt-[90px] relative z-10">
+        {/* Identity Card (left column) */}
+        <div
+          className="rounded-[12px] overflow-hidden"
+          style={{
+            background: "linear-gradient(180deg, #1a1413, #14100f)",
+            border: `2px solid ${color}`,
+            boxShadow: `0 0 30px ${color}33`,
+          }}
+        >
+          {/* Avatar + Name block */}
+          <div className="px-[18px] pt-[22px] pb-[14px] text-center">
             <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold flex-shrink-0"
+              className="w-[120px] h-[120px] rounded-full mx-auto flex items-center justify-center font-display font-black text-[56px] text-white"
               style={{
-                backgroundColor: `${profileColor}33`,
-                color: profileColor,
+                background: color,
+                border: "3px solid #14100f",
+                boxShadow: `0 0 0 3px ${color}, 0 0 40px ${color}99`,
               }}
             >
-              {nickname.charAt(0).toUpperCase()}
+              {nickname[0].toUpperCase()}
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 flex-wrap mb-2">
-                <h1 className="text-2xl font-bold text-[var(--foreground)]">
-                  @{profile.nickname}
-                </h1>
-                <span
-                  className="px-3 py-1 rounded-full text-sm font-medium"
-                  style={{
-                    backgroundColor: `${profileColor}22`,
-                    color: profileColor,
-                    border: `1px solid ${profileColor}44`,
-                  }}
+            <div className="font-display font-black text-[22px] text-[#f5e7d8] mt-3 tracking-[-0.3px]">
+              {nickname.split(".")[0]}
+            </div>
+            <div className="text-[12px] font-bold mt-0.5" style={{ color }}>
+              @{nickname}
+            </div>
+
+            <div className="mt-2.5">
+              <span
+                className="inline-block px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full"
+                style={{
+                  background: `${color}22`,
+                  color,
+                  border: `1px solid ${color}66`,
+                }}
+              >
+                {profile.title || "Fresh Degen"}
+              </span>
+            </div>
+
+            <div className="text-[10px] text-[var(--green)] mt-2 flex items-center justify-center gap-1.5">
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse-dot"
+                style={{ boxShadow: "0 0 6px var(--green)" }}
+              />
+              online {"\u00B7"} last seen 2m ago
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-1.5 px-3.5 pb-3.5">
+            <button
+              className="flex-1 py-[7px] px-2 text-[11px] font-bold rounded-md"
+              style={{
+                background: `linear-gradient(180deg, ${color}, ${color}cc)`,
+                border: `1px solid ${color}`,
+                color: "#fff",
+              }}
+            >
+              + watch
+            </button>
+            <button className="flex-1 py-[7px] px-2 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] text-[11px] font-bold rounded-md">
+              message
+            </button>
+            <button className="w-10 py-[7px] bg-[var(--bg)] border border-[var(--border)] text-[var(--text-secondary)] text-[11px] font-bold rounded-md">
+              {"\u2605"}
+            </button>
+          </div>
+
+          {/* Mood widget */}
+          <MoodWidget
+            mood={profile.mood || "vibing"}
+            currentlyDoing={profile.currentlyDoing}
+            specialty={profile.specialty}
+            chainMain="SOL \u00B7 ETH"
+            memberSince={memberSinceText}
+            userColor={color}
+            editable={isOwnProfile}
+          />
+
+          {/* Theme song */}
+          <ThemeSongPlayer
+            songUrl={profile.themeSongUrl}
+            songLabel={profile.themeSongLabel}
+            userColor={color}
+            editable={isOwnProfile}
+          />
+
+          {/* Achievement stickers */}
+          <AchievementStickers />
+        </div>
+
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
+          {/* Tabs */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-1.5 flex gap-1 flex-wrap">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-[7px] px-3.5 rounded-md text-[12px] font-bold cursor-pointer transition-colors ${
+                  activeTab === tab.id
+                    ? ""
+                    : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                }`}
+                style={
+                  activeTab === tab.id
+                    ? { background: `${color}22`, color }
+                    : {}
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          {activeTab === "about" && (
+            <div className="space-y-4">
+              {/* Bio block */}
+              <div
+                className="rounded-[12px] p-[22px] border"
+                style={{
+                  background: `linear-gradient(180deg, ${color}11, #1a1413)`,
+                  borderColor: `${color}55`,
+                }}
+              >
+                <h2
+                  className="font-display font-black text-[18px] tracking-[-0.3px] mb-2"
+                  style={{ color }}
                 >
-                  {profile.title}
-                </span>
-              </div>
-
-              {isEditing ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-[var(--foreground-muted)] mb-1">
-                      Bio
-                    </label>
-                    <textarea
-                      value={editBio}
-                      onChange={(e) => setEditBio(e.target.value.slice(0, 280))}
-                      className="input"
-                      rows={3}
-                      maxLength={280}
-                      placeholder="Tell us about yourself..."
-                    />
-                    <span className="text-xs text-[var(--foreground-dimmed)]">
-                      {editBio.length}/280
-                    </span>
+                  About me, <em className="text-[var(--gold)]">I guess.</em>
+                </h2>
+                {profile.bio ? (
+                  <div className="text-[var(--text)] text-[13px] leading-relaxed">
+                    {profile.bio.split("\n").map((paragraph, i) => (
+                      <p key={i} className="mb-2.5 last:mb-0">
+                        {paragraph}
+                      </p>
+                    ))}
                   </div>
-
-                  <div>
-                    <label className="block text-sm text-[var(--foreground-muted)] mb-2">
-                      Profile Color
-                    </label>
-                    <ColorPicker
-                      selectedColor={editColor}
-                      onChange={setEditColor}
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="btn-primary text-sm py-2 px-4"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditBio(profile.bio || "");
-                        setEditColor(profile.profileColor || "#ff1744");
-                      }}
-                      className="btn-secondary text-sm py-2 px-4"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {profile.bio && (
-                    <p className="text-[var(--foreground-muted)] mb-4">
-                      {profile.bio}
-                    </p>
-                  )}
-
-                  <div className="mb-4">
-                    <XPBar xp={profile.xp} title={profile.title || "Fresh Degen"} />
-                  </div>
-
-                  <p className="text-sm text-[var(--foreground-dimmed)]">
-                    Joined {formatDistanceToNow(new Date(profile.createdAt))}
+                ) : (
+                  <p className="text-[var(--text-muted)] text-[13px]">
+                    No bio yet. {isOwnProfile && "Click \"Customize\" to add one!"}
                   </p>
-
-                  {isOwnProfile && (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="btn-secondary text-sm py-2 px-4 mt-4"
-                    >
-                      Edit Profile
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="card p-6 mb-6">
-          <h2 className="text-lg font-bold text-[var(--foreground)] mb-4">Stats</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="text-center p-3 bg-[var(--background-tertiary)] rounded-lg">
-              <div className="text-2xl font-bold text-[var(--red-primary)]">
-                {profile.stats.reports}
-              </div>
-              <div className="text-xs text-[var(--foreground-muted)]">Reports</div>
-            </div>
-            <div className="text-center p-3 bg-[var(--background-tertiary)] rounded-lg">
-              <div className="text-2xl font-bold text-[var(--orange-primary)]">
-                {profile.stats.confirms}
-              </div>
-              <div className="text-xs text-[var(--foreground-muted)]">Confirms</div>
-            </div>
-            <div className="text-center p-3 bg-[var(--background-tertiary)] rounded-lg">
-              <div className="text-2xl font-bold text-[var(--green-primary)]">
-                {profile.stats.comments}
-              </div>
-              <div className="text-xs text-[var(--foreground-muted)]">Comments</div>
-            </div>
-            <div className="text-center p-3 bg-[var(--background-tertiary)] rounded-lg">
-              <div className="text-2xl font-bold text-[var(--purple-primary)]">
-                {profile.stats.roasts}
-              </div>
-              <div className="text-xs text-[var(--foreground-muted)]">Roasts</div>
-            </div>
-            <div className="text-center p-3 bg-[var(--background-tertiary)] rounded-lg">
-              <div className="text-2xl font-bold text-[var(--gold-primary)]">
-                {profile.stats.roastWins}
-              </div>
-              <div className="text-xs text-[var(--foreground-muted)]">Roast Wins</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="card p-6">
-          <h2 className="text-lg font-bold text-[var(--foreground)] mb-4">
-            Recent Activity
-          </h2>
-
-          {allActivity.length === 0 ? (
-            <p className="text-[var(--foreground-muted)] text-center py-8">
-              No activity yet. Time to start hunting scammers!
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {allActivity.slice(0, 15).map((activity, index) => (
-                <Link
-                  key={`${activity.type}-${index}`}
-                  href={`/report/${activity.reportId}`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-[var(--background-tertiary)] hover:bg-[var(--background-card)] transition-colors"
+                )}
+                <div
+                  className="font-mono font-bold mt-3.5 text-[13px]"
+                  style={{ color }}
                 >
-                  <span className="text-lg">
-                    {activity.type === "report"
-                      ? "\u{1F6A9}"
-                      : activity.type === "confirm"
-                      ? "\u{2705}"
-                      : "\u{1F4AC}"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[var(--foreground)]">
-                      {activity.type === "report" && (
-                        <>
-                          Reported{" "}
-                          <span className="text-[var(--red-primary)]">
-                            {"identifier" in activity && (activity as { reportType: string }).reportType === "twitter"
-                              ? "@"
-                              : ""}
-                            {("identifier" in activity ? (activity as { identifier: string }).identifier : "").slice(0, 12)}
-                            {("identifier" in activity ? (activity as { identifier: string }).identifier.length : 0) > 12 ? "..." : ""}
-                          </span>
-                        </>
-                      )}
-                      {activity.type === "confirm" && (
-                        <>
-                          Confirmed{" "}
-                          <span className="text-[var(--orange-primary)]">
-                            {"identifier" in activity && (activity as { reportType: string }).reportType === "twitter"
-                              ? "@"
-                              : ""}
-                            {("identifier" in activity ? (activity as { identifier: string }).identifier : "").slice(0, 12)}
-                            {("identifier" in activity ? (activity as { identifier: string }).identifier.length : 0) > 12 ? "..." : ""}
-                          </span>
-                        </>
-                      )}
-                      {activity.type === "comment" && (
-                        <>
-                          Commented:{" "}
-                          <span className="text-[var(--foreground-muted)]">
-                            &ldquo;{"preview" in activity ? (activity as { preview: string }).preview : ""}...&rdquo;
-                          </span>
-                        </>
-                      )}
-                    </p>
+                  {"\u2014"} {nickname} {"\u00B7"} est. {memberSinceText.split(" ")[1]} {"\u00B7"} {"\u2620"}
+                </div>
+              </div>
+
+              {/* Stat cards */}
+              <div className="grid grid-cols-4 gap-2.5">
+                {[
+                  { value: profile.stats.reports, label: "reports", color: "var(--red)", delta: "+3 this week" },
+                  { value: profile.stats.confirms, label: "confirms", color: "var(--gold)", delta: "+88 this week" },
+                  { value: profile.stats.roastWins, label: "roasts won", color: "var(--green)", delta: "+1 this week" },
+                  { value: "98%", label: "confirm rate", color: "var(--cyan)", delta: "top 1%" },
+                ].map((stat, i) => (
+                  <div
+                    key={i}
+                    className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3.5"
+                  >
+                    <div
+                      className="font-display font-black text-[28px] tracking-[-1px] leading-none"
+                      style={{ color: stat.color }}
+                    >
+                      {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
+                    </div>
+                    <div className="text-[var(--text-muted)] text-[10px] uppercase tracking-wider mt-1.5">
+                      {stat.label}
+                    </div>
+                    <div className="text-[var(--green)] text-[10px] mt-1">
+                      {stat.delta}
+                    </div>
                   </div>
-                  <span className="text-xs text-[var(--foreground-dimmed)]">
-                    {formatDistanceToNow(new Date(activity.createdAt))}
+                ))}
+              </div>
+
+              {/* XP block */}
+              <div className="bg-[linear-gradient(180deg,#1a1413,#161110)] border border-[var(--border)] rounded-[10px] p-4">
+                <div className="flex justify-between items-baseline text-[12px]">
+                  <span style={{ color }} className="font-bold">
+                    {"\u26CF"} {profile.title || "Fresh Degen"} {"\u00B7"} {profile.xp.toLocaleString()} XP
                   </span>
-                </Link>
-              ))}
+                  <span className="text-[var(--text-muted)]">
+                    {"\u2192"} {profile.nextTitleProgress?.nextTitle || "Sentinel"} ({profile.nextTitleProgress?.xpNeeded || 5000} XP)
+                  </span>
+                </div>
+                <div className="h-[10px] bg-[var(--bg)] rounded-full mt-2 overflow-hidden border border-[var(--border)]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${xpProgress}%`,
+                      background: `linear-gradient(90deg, ${color}, var(--gold))`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between mt-1.5 text-[10px] text-[var(--text-muted)]">
+                  <span>{profile.nextTitleProgress?.xpNeeded ? profile.nextTitleProgress.xpNeeded - profile.xp : 180} XP to next tier</span>
+                  <span>+62 today</span>
+                </div>
+              </div>
+
+              {/* Top 8 Watchdogs */}
+              <Top8Watchdogs
+                ownerNickname={nickname}
+                editable={isOwnProfile}
+                size="md"
+              />
             </div>
           )}
-        </div>
 
-        {/* Shame message */}
-        <div className="text-center mt-8">
-          <ShameMessage />
+          {activeTab === "wall" && (
+            <Wall userNickname={nickname} userColor={color} />
+          )}
+
+          {activeTab === "stats" && (
+            <div className="card p-6">
+              <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
+                Detailed Statistics
+              </h2>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: "Total Reports", value: profile.stats.reports, color: "var(--red)" },
+                  { label: "Total Confirms", value: profile.stats.confirms, color: "var(--gold)" },
+                  { label: "Comments", value: profile.stats.comments, color: "var(--cyan)" },
+                  { label: "Roasts Submitted", value: profile.stats.roasts, color: "var(--purple)" },
+                  { label: "Roast Wins", value: profile.stats.roastWins, color: "var(--green)" },
+                  { label: "Total XP", value: profile.xp, color: "var(--gold)" },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-4 text-center">
+                    <div className="font-display font-black text-[32px]" style={{ color: stat.color }}>
+                      {stat.value.toLocaleString()}
+                    </div>
+                    <div className="text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "reports" && (
+            <div className="card p-6 text-center text-[var(--text-muted)]">
+              <p>Reports tab coming soon...</p>
+              <p className="mt-2">
+                This user has submitted {profile.stats.reports} reports.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "roasts" && (
+            <div className="card p-6 text-center text-[var(--text-muted)]">
+              <p>Roasts tab coming soon...</p>
+              <p className="mt-2">
+                This user has won {profile.stats.roastWins} roast competitions.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "customize" && isOwnProfile && (
+            <div className="card p-6">
+              <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
+                Customize Your Profile
+              </h2>
+              <p className="text-[var(--text-muted)] mb-4">
+                Full customization panel coming soon...
+              </p>
+              <Link
+                href="/profile/edit"
+                className="btn-primary inline-block"
+              >
+                Edit Profile
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -8,45 +8,81 @@ datasource db {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  password     String
-  nickname     String      @unique
-  bio          String?     @default("")
-  profileColor String?     @default("#ff1744")
-  title        String?     @default("Fresh Degen")
-  xp           Int         @default(0)
-  createdAt    DateTime    @default(now())
-  reports      Report[]
-  confirms     Confirm[]
-  comments     Comment[]
-  roastVotes   RoastVote[]
-  roasts       Roast[]
-  bounties     Bounty[]
+  id              String      @id @default(cuid())
+  email           String      @unique
+  password        String
+  nickname        String      @unique
+  bio             String?     @default("")
+  profileColor    String?     @default("#ff3b9a")
+  title           String?     @default("Fresh Degen")
+  xp              Int         @default(0)
+
+  // New MySpace-style fields
+  mood            String?     @default("vibing")
+  currentlyDoing  String?     @default("")
+  specialty       String?     @default("")
+  themeSongUrl    String?
+  themeSongLabel  String?
+
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  reports           Report[]
+  confirms          Confirm[]
+  comments          Comment[]
+  roastVotes        RoastVote[]
+  roasts            Roast[]
+  bounties          Bounty[]
+  wallPosts         WallPost[]  @relation("wallOwner")
+  wallPostsWritten  WallPost[]  @relation("wallAuthor")
+  disputes          Dispute[]
 }
 
 model Report {
-  id          String    @id @default(cuid())
-  type        String    // "deployer" or "twitter"
-  identifier  String    // wallet address or twitter handle
-  reason      String
-  evidence    String?
-  author      User      @relation(fields: [authorId], references: [id])
-  authorId    String
-  confirms    Confirm[]
-  comments    Comment[]
-  roasts      Roast[]
-  bounties    Bounty[]
-  shameLocked Boolean   @default(false)
-  roastTitle  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String      @id @default(cuid())
+  type          String      // "deployer" or "twitter"
+  identifier    String      // wallet address or twitter handle
+  reason        String
+  evidence      String?
+  chain         String?     @default("ETH")
+
+  author        User        @relation(fields: [authorId], references: [id])
+  authorId      String
+
+  confirms      Confirm[]
+  disputes      Dispute[]
+  comments      Comment[]
+  roasts        Roast[]
+  bounties      Bounty[]
+
+  shameLocked   Boolean     @default(false)
+  roastTitle    String?
+  disputeCount  Int         @default(0)
+
+  // Subscammer (community/category) relation
+  subscammer    Subscammer? @relation(fields: [subscammerId], references: [id])
+  subscammerId  String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([identifier])
   @@index([createdAt])
+  @@index([subscammerId])
 }
 
 model Confirm {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reportId])
+}
+
+model Dispute {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id])
   userId    String
@@ -99,4 +135,28 @@ model Bounty {
   createdAt DateTime @default(now())
 
   @@unique([userId, reportId])
+}
+
+model WallPost {
+  id        String   @id @default(cuid())
+  body      String   // max 280 chars
+
+  user      User     @relation("wallOwner", fields: [userId], references: [id])
+  userId    String   // whose wall this is on
+
+  author    User     @relation("wallAuthor", fields: [authorId], references: [id])
+  authorId  String   // who wrote the post
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Subscammer {
+  id          String   @id @default(cuid())
+  slug        String   @unique // "rugpulls", "honeypots", etc.
+  name        String   // "Rug Pulls"
+  description String?
+  reports     Report[]
+  createdAt   DateTime @default(now())
 }
