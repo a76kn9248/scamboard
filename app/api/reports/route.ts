@@ -27,21 +27,45 @@ export async function GET(request: NextRequest) {
         }
       : {};
 
+    // Determine order by based on sort option
+    type OrderByType = { confirms?: { _count: "desc" | "asc" }; createdAt?: "desc" | "asc"; roasts?: { _count: "desc" | "asc" }; bounties?: { _count: "desc" | "asc" }; disputeCount?: "desc" | "asc" };
+    let orderBy: OrderByType = { createdAt: "desc" }; // default: new
+
+    switch (sort) {
+      case "confirms":
+      case "hot": // hot = most confirms
+        orderBy = { confirms: { _count: "desc" } };
+        break;
+      case "new":
+        orderBy = { createdAt: "desc" };
+        break;
+      case "controversial":
+        // controversial = has both confirms and disputes
+        orderBy = { disputeCount: "desc" };
+        break;
+      case "roasted":
+        orderBy = { roasts: { _count: "desc" } };
+        break;
+      case "bountied":
+        orderBy = { bounties: { _count: "desc" } };
+        break;
+    }
+
     const [reports, total] = await Promise.all([
       prisma.report.findMany({
         where,
         include: {
           author: {
-            select: { nickname: true },
+            select: { nickname: true, profileColor: true, title: true },
+          },
+          subscammer: {
+            select: { slug: true },
           },
           _count: {
-            select: { confirms: true, comments: true },
+            select: { confirms: true, comments: true, bounties: true },
           },
         },
-        orderBy:
-          sort === "confirms"
-            ? { confirms: { _count: "desc" } }
-            : { createdAt: "desc" },
+        orderBy,
         skip,
         take: limit,
       }),
@@ -54,9 +78,15 @@ export async function GET(request: NextRequest) {
       identifier: report.identifier,
       reason: report.reason,
       evidence: report.evidence,
+      chain: report.chain,
+      roastTitle: report.roastTitle,
       authorNickname: report.author.nickname,
+      authorColor: report.author.profileColor,
+      authorTitle: report.author.title,
+      subscammer: report.subscammer?.slug,
       confirmCount: report._count.confirms,
       commentCount: report._count.comments,
+      bountyCount: report._count.bounties,
       createdAt: report.createdAt,
       rank: skip + index + 1,
     }));

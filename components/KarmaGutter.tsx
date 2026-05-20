@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 interface KarmaGutterProps {
   reportId: string;
@@ -16,64 +17,16 @@ export default function KarmaGutter({
   score,
   rank,
   initialVoted = null,
-  onVote,
 }: KarmaGutterProps) {
   const { data: session } = useSession();
-  const [voted, setVoted] = useState<"up" | "down" | null>(initialVoted);
-  const [currentScore, setCurrentScore] = useState(score);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const [voted] = useState<"up" | "down" | null>(initialVoted);
+  const [currentScore] = useState(score);
 
-  const handleVote = async (direction: "up" | "down") => {
-    if (!session) return;
-    if (isSubmitting) return;
-
-    setIsSubmitting(true);
-
-    try {
-      if (direction === "up") {
-        // Confirm the report
-        const res = await fetch(`/api/reports/${reportId}/confirm`, {
-          method: "POST",
-        });
-
-        if (res.ok) {
-          if (voted === "up") {
-            // Unvote
-            setVoted(null);
-            setCurrentScore(currentScore - 1);
-          } else {
-            // Vote up (and remove down if present)
-            const adjustment = voted === "down" ? 2 : 1;
-            setVoted("up");
-            setCurrentScore(currentScore + adjustment);
-          }
-        }
-      } else {
-        // Dispute the report
-        const res = await fetch(`/api/reports/${reportId}/dispute`, {
-          method: "POST",
-        });
-
-        if (res.ok) {
-          if (voted === "down") {
-            // Unvote
-            setVoted(null);
-            setCurrentScore(currentScore + 1);
-          } else {
-            // Vote down (and remove up if present)
-            const adjustment = voted === "up" ? -2 : -1;
-            setVoted("down");
-            setCurrentScore(currentScore + adjustment);
-          }
-        }
-      }
-
-      onVote?.(direction);
-    } catch (error) {
-      console.error("Vote error:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleVote = (direction: "up" | "down") => {
+    // Navigate to the report page where user can confirm/dispute with full context
+    // This avoids the turnstile requirement issue for inline voting
+    router.push(`/report/${reportId}#${direction === "up" ? "confirm" : "dispute"}`);
   };
 
   const isPositive = currentScore > 0;
@@ -83,7 +36,7 @@ export default function KarmaGutter({
       {/* Up arrow */}
       <button
         onClick={() => handleVote("up")}
-        disabled={!session || isSubmitting}
+        disabled={!session}
         className={`karma-arrow ${voted === "up" ? "voted-up" : ""}`}
         title={session ? "Confirm this report" : "Login to confirm"}
       >
@@ -104,7 +57,7 @@ export default function KarmaGutter({
       {/* Down arrow */}
       <button
         onClick={() => handleVote("down")}
-        disabled={!session || isSubmitting}
+        disabled={!session}
         className={`karma-arrow ${voted === "down" ? "voted-down" : ""}`}
         title={session ? "Dispute this report" : "Login to dispute"}
       >

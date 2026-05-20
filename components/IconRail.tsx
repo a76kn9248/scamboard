@@ -5,9 +5,8 @@ import Link from "next/link";
 const railButtons = [
   { icon: "\u{1F6A9}", label: "Report", href: "/submit", primary: true },
   { icon: "\u{1F4B0}", label: "Bounty", href: "/bounties", primary: false },
-  { icon: "\u{1F525}", label: "Roast", href: "#", primary: false },
-  { icon: "\u{1F4E1}", label: "Watch", href: "/watchdogs", primary: false },
-  { icon: "\u2325", label: "Tools", href: "#", primary: false },
+  { icon: "\u{1F3C6}", label: "Infamy", href: "/hall-of-infamy", primary: false },
+  { icon: "\u{1F43A}", label: "Watch", href: "/watchdogs", primary: false },
 ];
 
 export default function IconRail() {

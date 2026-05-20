@@ -13,9 +13,10 @@ interface Watchdog {
 
 interface TopWatchdogsLeaderboardProps {
   limit?: number;
+  showFull?: boolean;
 }
 
-export default function TopWatchdogsLeaderboard({ limit = 5 }: TopWatchdogsLeaderboardProps) {
+export default function TopWatchdogsLeaderboard({ limit = 5, showFull = false }: TopWatchdogsLeaderboardProps) {
   const [watchdogs, setWatchdogs] = useState<Watchdog[]>([]);
   const [loading, setLoading] = useState(true);
 

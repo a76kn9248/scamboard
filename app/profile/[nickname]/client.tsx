@@ -9,6 +9,7 @@ import ThemeSongPlayer from "@/components/ThemeSongPlayer";
 import AchievementStickers from "@/components/AchievementStickers";
 import Top8Watchdogs from "@/components/Top8Watchdogs";
 import Wall from "@/components/Wall";
+import ProfileCustomizer from "@/components/ProfileCustomizer";
 
 interface UserProfile {
   nickname: string;
@@ -425,20 +426,11 @@ export default function UserProfileClient({ nickname }: { nickname: string }) {
           )}
 
           {activeTab === "customize" && isOwnProfile && (
-            <div className="card p-6">
-              <h2 className="font-display font-black text-[18px] text-[var(--text)] mb-4">
-                Customize Your Profile
-              </h2>
-              <p className="text-[var(--text-muted)] mb-4">
-                Full customization panel coming soon...
-              </p>
-              <Link
-                href="/profile/edit"
-                className="btn-primary inline-block"
-              >
-                Edit Profile
-              </Link>
-            </div>
+            <ProfileCustomizer
+              profile={profile}
+              color={color}
+              onUpdate={(updates) => setProfile({ ...profile, ...updates })}
+            />
           )}
         </div>
       </div>

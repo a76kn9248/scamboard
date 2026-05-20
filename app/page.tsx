@@ -103,9 +103,12 @@ function HomeContent() {
               <span className="text-[var(--text-muted)] text-[11px]">
                 refreshed every confirm
               </span>
-              <span className="ml-auto text-[var(--text-muted)] text-[11px] cursor-pointer hover:text-[var(--red)]">
-                see all 2,847 {"\u2192"}
-              </span>
+              <a
+                href="/hall-of-infamy"
+                className="ml-auto text-[var(--text-muted)] text-[11px] cursor-pointer hover:text-[var(--red)]"
+              >
+                see all {"\u2192"}
+              </a>
             </div>
             <TopEightWanted />
           </div>
