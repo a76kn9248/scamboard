@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -9,6 +9,14 @@ import ShameMessage from "@/components/ShameMessage";
 import ThreatBadge from "@/components/ThreatBadge";
 import ScammerAvatar from "@/components/ScammerAvatar";
 
+interface Community {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  reportCount: number;
+}
+
 export default function SubmitPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -16,22 +24,20 @@ export default function SubmitPage() {
   const [type, setType] = useState<"deployer" | "twitter">("deployer");
   const [identifier, setIdentifier] = useState("");
   const [chain, setChain] = useState("ETH");
-  const [category, setCategory] = useState("rugpulls");
+  const [selectedCommunity, setSelectedCommunity] = useState("general");
   const [reason, setReason] = useState("");
   const [evidence, setEvidence] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const CATEGORIES = [
-    { value: "rugpulls", label: "Rug Pulls" },
-    { value: "honeypots", label: "Honeypots" },
-    { value: "twitterscams", label: "Twitter Scams" },
-    { value: "alphafrauds", label: "Alpha Frauds" },
-    { value: "bridgehacks", label: "Bridge Hacks" },
-    { value: "discord_scams", label: "Discord Scams" },
-    { value: "under_investigation", label: "Under Investigation" },
-  ];
+  // Community state
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [loadingCommunities, setLoadingCommunities] = useState(true);
+  const [showCreateNew, setShowCreateNew] = useState(false);
+  const [newCommunityName, setNewCommunityName] = useState("");
+  const [creatingCommunity, setCreatingCommunity] = useState(false);
+  const [communityError, setCommunityError] = useState("");
 
   const CHAINS = [
     { value: "ETH", label: "Ethereum" },
@@ -43,6 +49,70 @@ export default function SubmitPage() {
     { value: "AVAX", label: "Avalanche" },
     { value: "OTHER", label: "Other" },
   ];
+
+  // Fetch communities on mount
+  useEffect(() => {
+    fetch("/api/subscammers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.subscammers) {
+          setCommunities(data.subscammers);
+        }
+      })
+      .catch((err) => console.error("Error fetching communities:", err))
+      .finally(() => setLoadingCommunities(false));
+  }, []);
+
+  const handleCommunityChange = (value: string) => {
+    if (value === "__create_new__") {
+      setShowCreateNew(true);
+      setSelectedCommunity("");
+    } else {
+      setShowCreateNew(false);
+      setSelectedCommunity(value);
+      setNewCommunityName("");
+      setCommunityError("");
+    }
+  };
+
+  const handleCreateCommunity = async () => {
+    if (!newCommunityName.trim()) return;
+
+    setCreatingCommunity(true);
+    setCommunityError("");
+
+    try {
+      const res = await fetch("/api/subscammers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCommunityName.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCommunityError(data.error || "Failed to create community");
+        return;
+      }
+
+      // Add to list and select it
+      setCommunities((prev) => [...prev, { ...data.subscammer, reportCount: 0 }].sort((a, b) => a.slug.localeCompare(b.slug)));
+      setSelectedCommunity(data.subscammer.slug);
+      setShowCreateNew(false);
+      setNewCommunityName("");
+    } catch {
+      setCommunityError("Network error. Please try again.");
+    } finally {
+      setCreatingCommunity(false);
+    }
+  };
+
+  // Validate new community name input
+  const handleNewCommunityInput = (value: string) => {
+    // Only allow alphanumeric, spaces, and underscores, max 30 chars
+    const cleaned = value.replace(/[^a-zA-Z0-9_\s]/g, "").slice(0, 30);
+    setNewCommunityName(cleaned);
+  };
 
   if (status === "loading") {
     return (
@@ -87,6 +157,11 @@ export default function SubmitPage() {
       return;
     }
 
+    if (!selectedCommunity && !showCreateNew) {
+      setError("Please select a community.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
@@ -98,7 +173,7 @@ export default function SubmitPage() {
           type,
           identifier: identifier.trim(),
           chain,
-          category,
+          category: selectedCommunity || "general",
           reason: reason.trim(),
           evidence: evidence.trim() || null,
           turnstileToken,
@@ -213,22 +288,80 @@ export default function SubmitPage() {
                 </div>
               )}
 
-              {/* Category */}
+              {/* Community Selection */}
               <div>
                 <label className="block text-sm text-[var(--foreground-muted)] mb-2">
-                  Category
+                  Community
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="input"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      r/{c.value} - {c.label}
-                    </option>
-                  ))}
-                </select>
+                {loadingCommunities ? (
+                  <div className="input bg-[var(--background-card)] text-[var(--foreground-muted)]">
+                    Loading communities...
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={showCreateNew ? "__create_new__" : selectedCommunity}
+                      onChange={(e) => handleCommunityChange(e.target.value)}
+                      className="input"
+                    >
+                      <option value="" disabled>Select a community</option>
+                      {communities.map((c) => (
+                        <option key={c.slug} value={c.slug}>
+                          r/{c.slug} - {c.name} ({c.reportCount})
+                        </option>
+                      ))}
+                      <option value="__create_new__">+ Create new community</option>
+                    </select>
+
+                    {/* Create new community inline form */}
+                    {showCreateNew && (
+                      <div className="mt-3 p-4 border border-[var(--border)] rounded-lg bg-[var(--background-card)]">
+                        <label className="block text-sm text-[var(--foreground-muted)] mb-2">
+                          New Community Name
+                        </label>
+                        <div className="flex gap-2">
+                          <div className="flex-1 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground-muted)]">r/</span>
+                            <input
+                              type="text"
+                              value={newCommunityName}
+                              onChange={(e) => handleNewCommunityInput(e.target.value)}
+                              placeholder="community_name"
+                              className="input pl-8"
+                              maxLength={30}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCreateCommunity}
+                            disabled={!newCommunityName.trim() || creatingCommunity}
+                            className="btn-secondary px-4 disabled:opacity-50"
+                          >
+                            {creatingCommunity ? "Creating..." : "Create"}
+                          </button>
+                        </div>
+                        <p className="text-xs text-[var(--foreground-dimmed)] mt-2">
+                          2-30 characters. Letters, numbers, and underscores only.
+                        </p>
+                        {communityError && (
+                          <p className="text-[var(--red-primary)] text-sm mt-2">{communityError}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCreateNew(false);
+                            setSelectedCommunity("general");
+                            setNewCommunityName("");
+                            setCommunityError("");
+                          }}
+                          className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] mt-2"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Reason */}
@@ -276,7 +409,7 @@ export default function SubmitPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={!identifier || !reason || !turnstileToken || isSubmitting}
+                disabled={!identifier || !reason || !turnstileToken || isSubmitting || (!selectedCommunity && !showCreateNew)}
                 className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "SUBMITTING..." : "&#x1F6A9; SUBMIT REPORT"}
@@ -303,6 +436,9 @@ export default function SubmitPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="text-xs text-[var(--foreground-muted)]">
+                      r/{selectedCommunity || "general"}
+                    </span>
                     <span
                       className={`badge ${
                         type === "deployer" ? "badge-purple" : "badge-success"

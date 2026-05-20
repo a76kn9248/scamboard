@@ -198,16 +198,33 @@ export async function POST(request: NextRequest) {
         ? sanitizedIdentifier.slice(1)
         : sanitizedIdentifier;
 
-    // Find or create subscammer category
+    // Find subscammer category (default to "general" if not found)
     let subscammerId: string | undefined;
-    if (category) {
-      const subscammer = await prisma.subscammer.findUnique({
-        where: { slug: category },
+    const categorySlug = category || "general";
+
+    let subscammer = await prisma.subscammer.findUnique({
+      where: { slug: categorySlug },
+    });
+
+    // If category not found and it's not "general", try "general" as fallback
+    if (!subscammer && categorySlug !== "general") {
+      subscammer = await prisma.subscammer.findUnique({
+        where: { slug: "general" },
       });
-      if (subscammer) {
-        subscammerId = subscammer.id;
-      }
     }
+
+    // If still no subscammer (general doesn't exist), create it
+    if (!subscammer) {
+      subscammer = await prisma.subscammer.create({
+        data: {
+          slug: "general",
+          name: "General",
+          description: "Reports that don't fit a specific category",
+        },
+      });
+    }
+
+    subscammerId = subscammer.id;
 
     const report = await prisma.report.create({
       data: {
